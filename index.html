@@ -301,6 +301,153 @@
             return <canvas ref={canvasRef} width={width} height={height} />;
         };
 
+        // Красивая радарная диаграмма (звездочка) для топ-5
+        const RadarChart = ({ data, width = 600, height = 400 }) => {
+            const canvasRef = useRef(null);
+
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas || !data || data.length === 0) return;
+
+                const ctx = canvas.getContext('2d');
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const maxRadius = Math.min(width, height) / 2 - 80;
+
+                // Очищаем canvas
+                ctx.clearRect(0, 0, width, height);
+
+                // Критерии оценки
+                const criteria = [
+                    'Trust',
+                    'Passive Consumption', 
+                    'Format',
+                    'Attention Share',
+                    'Contact Time',
+                    'Momentary Clutter'
+                ];
+
+                const angleStep = (Math.PI * 2) / criteria.length;
+                const colors = [
+                    '#3498db', // Синий
+                    '#2ecc71', // Зеленый  
+                    '#f39c12', // Оранжевый
+                    '#e74c3c', // Красный
+                    '#9b59b6'  // Фиолетовый
+                ];
+
+                // Рисуем концентрические окружности (сетку)
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 1;
+                for (let i = 1; i <= 5; i++) {
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, (maxRadius * i) / 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // Рисуем оси и подписи критериев
+                ctx.strokeStyle = '#ccc';
+                ctx.fillStyle = '#555';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+
+                criteria.forEach((criterion, index) => {
+                    const angle = index * angleStep - Math.PI / 2;
+                    const x1 = centerX;
+                    const y1 = centerY;
+                    const x2 = centerX + Math.cos(angle) * maxRadius;
+                    const y2 = centerY + Math.sin(angle) * maxRadius;
+
+                    // Линия оси
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+
+                    // Подпись критерия
+                    const labelX = centerX + Math.cos(angle) * (maxRadius + 20);
+                    const labelY = centerY + Math.sin(angle) * (maxRadius + 20);
+                    ctx.fillText(criterion, labelX, labelY + 4);
+                });
+
+                // Рисуем значения для топ-5 элементов
+                const top5 = data.slice(0, 5);
+                
+                top5.forEach((item, itemIndex) => {
+                    if (itemIndex >= colors.length) return;
+                    
+                    const values = [
+                        item.trust || 0,
+                        item.passiveConsumption || 0,
+                        item.formatScore || 0,
+                        item.attentionShare || 0,
+                        item.contactTime || 0,
+                        item.momentaryClutter || 0
+                    ];
+
+                    // Нормализуем значения (предполагаем что все значения от 0 до 1)
+                    const points = values.map((value, index) => {
+                        const angle = index * angleStep - Math.PI / 2;
+                        const radius = Math.min(value, 1) * maxRadius; // Ограничиваем максимум единицей
+                        return {
+                            x: centerX + Math.cos(angle) * radius,
+                            y: centerY + Math.sin(angle) * radius
+                        };
+                    });
+
+                    // Рисуем заливку
+                    ctx.fillStyle = colors[itemIndex] + '20'; // Добавляем прозрачность
+                    ctx.beginPath();
+                    ctx.moveTo(points[0].x, points[0].y);
+                    for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(points[i].x, points[i].y);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Рисуем контур
+                    ctx.strokeStyle = colors[itemIndex];
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Рисуем точки
+                    ctx.fillStyle = colors[itemIndex];
+                    points.forEach(point => {
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                });
+
+                // Легенда
+                const legendX = 20;
+                let legendY = height - 120;
+                
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#333';
+                ctx.fillText('Легенда:', legendX, legendY);
+                legendY += 20;
+
+                top5.forEach((item, index) => {
+                    if (index >= colors.length) return;
+                    
+                    // Цветной квадратик
+                    ctx.fillStyle = colors[index];
+                    ctx.fillRect(legendX, legendY - 8, 12, 12);
+                    
+                    // Название
+                    ctx.fillStyle = '#333';
+                    const shortName = item.name.length > 25 ? item.name.substring(0, 25) + '...' : item.name;
+                    ctx.fillText(shortName, legendX + 20, legendY + 2);
+                    legendY += 18;
+                });
+
+            }, [data, width, height]);
+
+            return <canvas ref={canvasRef} width={width} height={height} />;
+        };
+
         // Главный компонент
         const MediaRatingDashboard = () => {
             const [data, setData] = useState([]);
@@ -581,12 +728,19 @@
                         </div>
                     </div>
 
-                    {/* График */}
+                    {/* Графики */}
                     <div className="chart-container">
                         <div className="chart-card">
                             <h2 className="card-title">📊 Интегральные рейтинги</h2>
                             <div className="canvas-container">
                                 <BarChart data={processedData} width={600} height={400} />
+                            </div>
+                        </div>
+                        
+                        <div className="chart-card">
+                            <h2 className="card-title">⭐ Сравнение топ-5 по критериям</h2>
+                            <div className="canvas-container">
+                                <RadarChart data={processedData} width={600} height={400} />
                             </div>
                         </div>
                     </div>
