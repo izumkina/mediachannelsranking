@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Рейтинг качества медиа каналов</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.8.0/Recharts.js"></script>
+    <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -21,6 +21,7 @@
         const MediaRatingDashboard = () => {
             const [data, setData] = useState([]);
             const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
             const [viewMode, setViewMode] = useState('channels');
             const [selectedChannels, setSelectedChannels] = useState([]);
             const [availableChannels, setAvailableChannels] = useState([]);
@@ -29,15 +30,55 @@
             useEffect(() => {
                 const loadData = async () => {
                     try {
-                        const response = await fetch('calc_mts_v18_processed.xlsx');
-                        const arrayBuffer = await response.arrayBuffer();
-                        const workbook = XLSX.read(arrayBuffer);
+                        console.log('Начинаем загрузку Excel файла...');
+                        
+                        // Пробуем загрузить файл разными способами
+                        let response;
+                        let arrayBuffer;
+                        
+                        try {
+                            // Способ 1: прямая загрузка файла
+                            response = await fetch('./calc_mts_v18_processed.xlsx');
+                            if (response.ok) {
+                                arrayBuffer = await response.arrayBuffer();
+                                console.log('✅ Файл загружен через fetch');
+                            } else {
+                                throw new Error('Файл не найден через fetch');
+                            }
+                        } catch (fetchError) {
+                            console.log('❌ Fetch не сработал, пробуем другие способы...');
+                            
+                            // Способ 2: если есть window.fs (как в Claude)
+                            if (typeof window !== 'undefined' && window.fs && window.fs.readFile) {
+                                console.log('Пробуем window.fs.readFile...');
+                                const fileData = await window.fs.readFile('calc_mts_v18_processed.xlsx');
+                                arrayBuffer = fileData.buffer || fileData;
+                                console.log('✅ Файл загружен через window.fs');
+                            } else {
+                                throw new Error('Не удалось найти файл ни одним способом');
+                            }
+                        }
+                        
+                        console.log('Размер файла:', arrayBuffer.byteLength, 'байт');
+                        
+                        // Парсим Excel файл
+                        const workbook = XLSX.read(arrayBuffer, {
+                            cellStyles: true,
+                            cellFormulas: true,
+                            cellDates: true
+                        });
+                        
+                        console.log('Листы в файле:', workbook.SheetNames);
+                        
                         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                         const rawData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
                         
-                        const processedData = rawData.slice(1).map(row => ({
+                        console.log('Строк данных:', rawData.length);
+                        
+                        // Обрабатываем данные
+                        const processedData = rawData.slice(1).map((row, index) => ({
                             channel: row[0],
-                            format: row[1],
+                            format: row[1], 
                             duration: row[2],
                             trust: row[10] || 0,
                             passiveConsumption: row[11] || 0,
@@ -46,17 +87,24 @@
                             contactTime: row[14] || 0,
                             momentaryClutter: row[15] || 0,
                             integralIndex: row[16] || 0
-                        })).filter(item => item.channel);
+                        })).filter(item => item.channel && item.channel !== '');
 
+                        console.log('Обработанных записей:', processedData.length);
+                        
                         setData(processedData);
                         
+                        // Получаем уникальные каналы
                         const channels = [...new Set(processedData.map(item => item.channel))];
+                        console.log('Уникальных каналов:', channels.length);
                         setAvailableChannels(channels);
-                        setSelectedChannels(channels.slice(0, 5));
+                        setSelectedChannels(channels.slice(0, 5)); // По умолчанию первые 5
                         
                         setLoading(false);
+                        console.log('✅ Данные успешно загружены!');
+                        
                     } catch (error) {
-                        console.error('Ошибка загрузки данных:', error);
+                        console.error('❌ Ошибка загрузки:', error);
+                        setError(error.message);
                         setLoading(false);
                     }
                 };
@@ -68,6 +116,7 @@
                 let filtered = data.filter(item => selectedChannels.includes(item.channel));
                 
                 if (viewMode === 'channels') {
+                    // Группируем по каналам
                     const channelGroups = {};
                     filtered.forEach(item => {
                         if (!channelGroups[item.channel]) {
@@ -91,6 +140,7 @@
                         channelGroups[item.channel].integralIndex.push(item.integralIndex);
                     });
                     
+                    // Вычисляем средние значения
                     const aggregated = Object.values(channelGroups).map(group => ({
                         name: group.channel,
                         channel: group.channel,
@@ -141,7 +191,7 @@
                     const dataPoint = { criterion: criterion.name };
                     top5.forEach((item, index) => {
                         dataPoint[`item${index}`] = item[criterion.key] || 0;
-                        dataPoint[`name${index}`] = item.name.length > 20 ? item.name.substring(0, 20) + '...' : item.name;
+                        dataPoint[`name${index}`] = item.name && item.name.length > 20 ? item.name.substring(0, 20) + '...' : item.name;
                     });
                     return dataPoint;
                 });
@@ -158,176 +208,207 @@
             const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'];
 
             if (loading) {
-                return React.createElement('div', {className: "flex justify-center items-center h-64"}, 'Загрузка данных...');
+                return (
+                    <div className="flex justify-center items-center h-screen flex-col">
+                        <div className="text-xl font-bold mb-4">Загрузка данных...</div>
+                        <div className="text-sm text-gray-600">Читаем Excel файл</div>
+                    </div>
+                );
             }
 
-            return React.createElement('div', {className: "max-w-7xl mx-auto p-6 space-y-6"}, [
-                React.createElement('h1', {className: "text-3xl font-bold text-center mb-8", key: 'title'}, 'Рейтинг качества медиа каналов'),
-                
-                React.createElement('div', {className: "bg-white p-6 rounded-lg shadow-md space-y-4", key: 'controls'}, [
-                    React.createElement('div', {className: "grid grid-cols-1 md:grid-cols-3 gap-4", key: 'control-grid'}, [
-                        React.createElement('div', {key: 'mode-select'}, [
-                            React.createElement('label', {className: "block text-sm font-medium mb-2"}, 'Режим отображения:'),
-                            React.createElement('select', {
-                                value: viewMode,
-                                onChange: (e) => setViewMode(e.target.value),
-                                className: "w-full p-2 border border-gray-300 rounded-md"
-                            }, [
-                                React.createElement('option', {value: 'channels', key: 'ch'}, 'Только каналы'),
-                                React.createElement('option', {value: 'channel-format', key: 'cf'}, 'Канал + Формат'),
-                                React.createElement('option', {value: 'channel-format-duration', key: 'cfd'}, 'Канал + Формат + Длительность')
-                            ])
-                        ]),
+            if (error) {
+                return (
+                    <div className="flex justify-center items-center h-screen flex-col">
+                        <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded max-w-lg">
+                            <h3 className="font-bold text-lg mb-2">Ошибка загрузки данных</h3>
+                            <p className="mb-3">{error}</p>
+                            <div className="text-sm">
+                                <p className="font-semibold mb-1">Возможные причины:</p>
+                                <ul className="list-disc list-inside space-y-1">
+                                    <li>Файл <code>calc_mts_v18_processed.xlsx</code> не найден</li>
+                                    <li>Файл находится не в корневой папке сайта</li>
+                                    <li>Неправильное название файла</li>
+                                    <li>Файл поврежден или имеет неправильный формат</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => window.location.reload()} 
+                            className="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
+                        >
+                            Попробовать снова
+                        </button>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="max-w-7xl mx-auto p-6 space-y-6">
+                    <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">Рейтинг качества медиа каналов</h1>
+                    
+                    {/* Панель управления */}
+                    <div className="bg-white p-6 rounded-lg shadow-md space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Режим отображения:</label>
+                                <select 
+                                    value={viewMode} 
+                                    onChange={(e) => setViewMode(e.target.value)}
+                                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="channels">Только каналы</option>
+                                    <option value="channel-format">Канал + Формат</option>
+                                    <option value="channel-format-duration">Канал + Формат + Длительность</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Количество элементов: {displayCount}</label>
+                                <input
+                                    type="range"
+                                    min="5"
+                                    max="30"
+                                    value={displayCount}
+                                    onChange={(e) => setDisplayCount(parseInt(e.target.value))}
+                                    className="w-full"
+                                />
+                            </div>
+                            
+                            <div className="flex items-center justify-center">
+                                <div className="text-sm text-gray-600 text-center">
+                                    <div>Показано: {Math.min(displayCount, processedData.length)} из {processedData.length}</div>
+                                    <div>Всего записей: {data.length}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Выберите каналы:</label>
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+                                {availableChannels.map(channel => (
+                                    <label key={channel} className="flex items-center space-x-2 text-sm hover:bg-gray-50 p-1 rounded">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedChannels.includes(channel)}
+                                            onChange={() => handleChannelToggle(channel)}
+                                            className="rounded"
+                                        />
+                                        <span className="truncate" title={channel}>{channel}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Таблица рейтингов */}
+                    <div className="bg-white p-6 rounded-lg shadow-md">
+                        <h2 className="text-xl font-semibold mb-4">Таблица рейтингов</h2>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-3 py-2 text-left font-medium">Рейтинг</th>
+                                        <th className="px-3 py-2 text-left font-medium">Название</th>
+                                        <th className="px-3 py-2 text-center font-medium">Интегральный индекс</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {processedData.map((item, index) => (
+                                        <tr key={index} className={`hover:bg-gray-50 ${index % 2 === 0 ? 'bg-gray-25' : 'bg-white'}`}>
+                                            <td className="px-3 py-2 font-semibold text-blue-600">#{index + 1}</td>
+                                            <td className="px-3 py-2 font-medium">{item.name}</td>
+                                            <td className="px-3 py-2 text-center font-bold text-green-600">
+                                                {item.integralIndex.toFixed(3)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Графики */}
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                         
-                        React.createElement('div', {key: 'count-slider'}, [
-                            React.createElement('label', {className: "block text-sm font-medium mb-2"}, `Количество элементов: ${displayCount}`),
-                            React.createElement('input', {
-                                type: "range",
-                                min: "5",
-                                max: "30",
-                                value: displayCount,
-                                onChange: (e) => setDisplayCount(parseInt(e.target.value)),
-                                className: "w-full"
-                            })
-                        ]),
-                        
-                        React.createElement('div', {className: "flex items-center justify-center", key: 'stats'}, 
-                            React.createElement('div', {className: "text-sm text-gray-600"}, 
-                                `Показано: ${Math.min(displayCount, processedData.length)} из ${processedData.length} элементов`
-                            )
-                        )
-                    ]),
+                        {/* Столбчатая диаграмма */}
+                        <div className="bg-white p-6 rounded-lg shadow-md">
+                            <h2 className="text-xl font-semibold mb-4">Интегральные рейтинги</h2>
+                            <ResponsiveContainer width="100%" height={400}>
+                                <BarChart data={processedData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis 
+                                        dataKey="name" 
+                                        angle={-45}
+                                        textAnchor="end"
+                                        height={80}
+                                        interval={0}
+                                        fontSize={10}
+                                    />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Bar dataKey="integralIndex" fill="#3B82F6" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
 
-                    React.createElement('div', {key: 'channel-selector'}, [
-                        React.createElement('label', {className: "block text-sm font-medium mb-2"}, 'Выберите каналы:'),
-                        React.createElement('div', {className: "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2"}, 
-                            availableChannels.map(channel => 
-                                React.createElement('label', {
-                                    key: channel, 
-                                    className: "flex items-center space-x-2 text-sm"
-                                }, [
-                                    React.createElement('input', {
-                                        type: "checkbox",
-                                        checked: selectedChannels.includes(channel),
-                                        onChange: () => handleChannelToggle(channel),
-                                        className: "rounded"
-                                    }),
-                                    React.createElement('span', {
-                                        className: "truncate", 
-                                        title: channel
-                                    }, channel)
-                                ])
-                            )
-                        )
-                    ])
-                ]),
+                        {/* Радарная диаграмма */}
+                        <div className="bg-white p-6 rounded-lg shadow-md">
+                            <h2 className="text-xl font-semibold mb-4">Сравнение топ-5 по критериям</h2>
+                            <ResponsiveContainer width="100%" height={400}>
+                                <RadarChart data={radarData}>
+                                    <PolarGrid />
+                                    <PolarAngleAxis dataKey="criterion" tick={{ fontSize: 10 }} />
+                                    <PolarRadiusAxis angle={30} domain={[0, 1]} />
+                                    {processedData.slice(0, 5).map((item, index) => (
+                                        <Radar
+                                            key={index}
+                                            name={radarData[0] && radarData[0][`name${index}`] ? radarData[0][`name${index}`] : item.name}
+                                            dataKey={`item${index}`}
+                                            stroke={colors[index]}
+                                            fill={colors[index]}
+                                            fillOpacity={0.1}
+                                        />
+                                    ))}
+                                    <Legend />
+                                </RadarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
 
-                React.createElement('div', {className: "bg-white p-6 rounded-lg shadow-md", key: 'table'}, [
-                    React.createElement('h2', {className: "text-xl font-semibold mb-4"}, 'Таблица рейтингов'),
-                    React.createElement('div', {className: "overflow-x-auto"}, 
-                        React.createElement('table', {className: "w-full text-sm"}, [
-                            React.createElement('thead', {className: "bg-gray-50"}, 
-                                React.createElement('tr', {}, [
-                                    React.createElement('th', {className: "px-3 py-2 text-left font-medium"}, 'Рейтинг'),
-                                    React.createElement('th', {className: "px-3 py-2 text-left font-medium"}, 'Название'),
-                                    React.createElement('th', {className: "px-3 py-2 text-center font-medium"}, 'Интегральный индекс')
-                                ])
-                            ),
-                            React.createElement('tbody', {}, 
-                                processedData.map((item, index) => 
-                                    React.createElement('tr', {
-                                        key: index, 
-                                        className: index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-                                    }, [
-                                        React.createElement('td', {className: "px-3 py-2 font-semibold"}, index + 1),
-                                        React.createElement('td', {className: "px-3 py-2 font-medium"}, item.name),
-                                        React.createElement('td', {className: "px-3 py-2 text-center font-bold text-blue-600"}, 
-                                            item.integralIndex.toFixed(3)
-                                        )
-                                    ])
-                                )
-                            )
-                        ])
-                    )
-                ]),
-
-                React.createElement('div', {className: "grid grid-cols-1 xl:grid-cols-2 gap-6", key: 'charts'}, [
-                    React.createElement('div', {className: "bg-white p-6 rounded-lg shadow-md", key: 'bar-chart'}, [
-                        React.createElement('h2', {className: "text-xl font-semibold mb-4"}, 'Интегральные рейтинги'),
-                        React.createElement(ResponsiveContainer, {width: "100%", height: 400}, 
-                            React.createElement(BarChart, {
-                                data: processedData, 
-                                margin: { top: 20, right: 30, left: 20, bottom: 80 }
-                            }, [
-                                React.createElement(CartesianGrid, {strokeDasharray: "3 3"}),
-                                React.createElement(XAxis, {
-                                    dataKey: "name",
-                                    angle: -45,
-                                    textAnchor: "end",
-                                    height: 80,
-                                    interval: 0,
-                                    fontSize: 10
-                                }),
-                                React.createElement(YAxis, {}),
-                                React.createElement(Tooltip, {}),
-                                React.createElement(Bar, {dataKey: "integralIndex", fill: "#8884d8"})
-                            ])
-                        )
-                    ]),
-
-                    React.createElement('div', {className: "bg-white p-6 rounded-lg shadow-md", key: 'radar-chart'}, [
-                        React.createElement('h2', {className: "text-xl font-semibold mb-4"}, 'Сравнение топ-5 по критериям'),
-                        React.createElement(ResponsiveContainer, {width: "100%", height: 400}, 
-                            React.createElement(RadarChart, {data: radarData}, [
-                                React.createElement(PolarGrid, {}),
-                                React.createElement(PolarAngleAxis, {dataKey: "criterion", tick: { fontSize: 10 }}),
-                                React.createElement(PolarRadiusAxis, {angle: 30, domain: [0, 1]}),
-                                ...processedData.slice(0, 5).map((item, index) => 
-                                    React.createElement(Radar, {
-                                        key: index,
-                                        name: radarData[0] && radarData[0][`name${index}`] ? radarData[0][`name${index}`] : item.name,
-                                        dataKey: `item${index}`,
-                                        stroke: colors[index],
-                                        fill: colors[index],
-                                        fillOpacity: 0.1
-                                    })
-                                ),
-                                React.createElement(Legend, {})
-                            ])
-                        )
-                    ])
-                ]),
-
-                React.createElement('div', {className: "bg-white p-6 rounded-lg shadow-md", key: 'stats'}, [
-                    React.createElement('h2', {className: "text-xl font-semibold mb-4"}, 'Статистика'),
-                    React.createElement('div', {className: "grid grid-cols-2 md:grid-cols-4 gap-4 text-center"}, [
-                        React.createElement('div', {key: 'stat1'}, [
-                            React.createElement('div', {className: "text-2xl font-bold text-blue-600"}, selectedChannels.length),
-                            React.createElement('div', {className: "text-sm text-gray-600"}, 'Выбрано каналов')
-                        ]),
-                        React.createElement('div', {key: 'stat2'}, [
-                            React.createElement('div', {className: "text-2xl font-bold text-green-600"}, 
-                                data.filter(item => selectedChannels.includes(item.channel)).length
-                            ),
-                            React.createElement('div', {className: "text-sm text-gray-600"}, 'Всего записей')
-                        ]),
-                        React.createElement('div', {key: 'stat3'}, [
-                            React.createElement('div', {className: "text-2xl font-bold text-orange-600"}, 
-                                processedData.length > 0 ? processedData[0].integralIndex.toFixed(3) : '0'
-                            ),
-                            React.createElement('div', {className: "text-sm text-gray-600"}, 'Лучший рейтинг')
-                        ]),
-                        React.createElement('div', {key: 'stat4'}, [
-                            React.createElement('div', {className: "text-2xl font-bold text-red-600"}, 
-                                processedData.length > 0 ? 
-                                    (processedData.reduce((sum, item) => sum + item.integralIndex, 0) / processedData.length).toFixed(3) 
-                                    : '0'
-                            ),
-                            React.createElement('div', {className: "text-sm text-gray-600"}, 'Средний рейтинг')
-                        ])
-                    ])
-                ])
-            ]);
+                    {/* Статистика */}
+                    <div className="bg-white p-6 rounded-lg shadow-md">
+                        <h2 className="text-xl font-semibold mb-4">Статистика</h2>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                            <div className="p-4 bg-blue-50 rounded-lg">
+                                <div className="text-2xl font-bold text-blue-600">
+                                    {selectedChannels.length}
+                                </div>
+                                <div className="text-sm text-blue-800">Выбрано каналов</div>
+                            </div>
+                            <div className="p-4 bg-green-50 rounded-lg">
+                                <div className="text-2xl font-bold text-green-600">
+                                    {data.filter(item => selectedChannels.includes(item.channel)).length}
+                                </div>
+                                <div className="text-sm text-green-800">Всего записей</div>
+                            </div>
+                            <div className="p-4 bg-orange-50 rounded-lg">
+                                <div className="text-2xl font-bold text-orange-600">
+                                    {processedData.length > 0 ? processedData[0].integralIndex.toFixed(3) : '0'}
+                                </div>
+                                <div className="text-sm text-orange-800">Лучший рейтинг</div>
+                            </div>
+                            <div className="p-4 bg-purple-50 rounded-lg">
+                                <div className="text-2xl font-bold text-purple-600">
+                                    {processedData.length > 0 ? 
+                                        (processedData.reduce((sum, item) => sum + item.integralIndex, 0) / processedData.length).toFixed(3) 
+                                        : '0'}
+                                </div>
+                                <div className="text-sm text-purple-800">Средний рейтинг</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
         };
 
         ReactDOM.render(React.createElement(MediaRatingDashboard), document.getElementById('root'));
