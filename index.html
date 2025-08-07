@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Рейтинг качества медиа каналов</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.8.0/Recharts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } = Recharts;
+
+        const MediaRatingDashboard = () => {
+            const [data, setData] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [viewMode, setViewMode] = useState('channels');
+            const [selectedChannels, setSelectedChannels] = useState([]);
+            const [availableChannels, setAvailableChannels] = useState([]);
+            const [displayCount, setDisplayCount] = useState(10);
+
+            useEffect(() => {
+                const loadData = async () => {
+                    try {
+                        const response = await fetch('calc_mts_v18_processed.xlsx');
+                        const arrayBuffer = await response.arrayBuffer();
+                        const workbook = XLSX.read(arrayBuffer);
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const rawData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+                        
+                        const processedData = rawData.slice(1).map(row => ({
+                            channel: row[0],
+                            format: row[1],
+                            duration: row[2],
+                            trust: row[10] || 0,
+                            passiveConsumption: row[11] || 0,
+                            formatScore: row[12] || 0,
+                            attentionShare: row[13] || 0,
+                            contactTime: row[14] || 0,
+                            momentaryClutter: row[15] || 0,
+                            integralIndex: row[16] || 0
+                        })).filter(item => item.channel);
+
+                        setData(processedData);
+                        
+                        const channels = [...new Set(processedData.map(item => item.channel))];
+                        setAvailableChannels(channels);
+                        setSelectedChannels(channels.slice(0, 5));
+                        
+                        setLoading(false);
+                    } catch (error) {
+                        console.error('Ошибка загрузки данных:', error);
+                        setLoading(false);
+                    }
+                };
+                
+                loadData();
+            }, []);
+
+            const processedData = useMemo(() => {
+                let filtered = data.filter(item => selectedChannels.includes(item.channel));
+                
+                if (viewMode === 'channels') {
+                    const channelGroups = {};
+                    filtered.forEach(item => {
+                        if (!channelGroups[item.channel]) {
+                            channelGroups[item.channel] = {
+                                channel: item.channel,
+                                trust: [],
+                                passiveConsumption: [],
+                                formatScore: [],
+                                attentionShare: [],
+                                contactTime: [],
+                                momentaryClutter: [],
+                                integralIndex: []
+                            };
+                        }
+                        channelGroups[item.channel].trust.push(item.trust);
+                        channelGroups[item.channel].passiveConsumption.push(item.passiveConsumption);
+                        channelGroups[item.channel].formatScore.push(item.formatScore);
+                        channelGroups[item.channel].attentionShare.push(item.attentionShare);
+                        channelGroups[item.channel].contactTime.push(item.contactTime);
+                        channelGroups[item.channel].momentaryClutter.push(item.momentaryClutter);
+                        channelGroups[item.channel].integralIndex.push(item.integralIndex);
+                    });
+                    
+                    const aggregated = Object.values(channelGroups).map(group => ({
+                        name: group.channel,
+                        channel: group.channel,
+                        trust: group.trust.reduce((a, b) => a + b, 0) / group.trust.length,
+                        passiveConsumption: group.passiveConsumption.reduce((a, b) => a + b, 0) / group.passiveConsumption.length,
+                        formatScore: group.formatScore.reduce((a, b) => a + b, 0) / group.formatScore.length,
+                        attentionShare: group.attentionShare.reduce((a, b) => a + b, 0) / group.attentionShare.length,
+                        contactTime: group.contactTime.reduce((a, b) => a + b, 0) / group.contactTime.length,
+                        momentaryClutter: group.momentaryClutter.reduce((a, b) => a + b, 0) / group.momentaryClutter.length,
+                        integralIndex: group.integralIndex.reduce((a, b) => a + b, 0) / group.integralIndex.length
+                    }));
+                    
+                    return aggregated
+                        .sort((a, b) => b.integralIndex - a.integralIndex)
+                        .slice(0, displayCount);
+                        
+                } else if (viewMode === 'channel-format') {
+                    return filtered
+                        .map(item => ({
+                            ...item,
+                            name: `${item.channel} - ${item.format}`
+                        }))
+                        .sort((a, b) => b.integralIndex - a.integralIndex)
+                        .slice(0, displayCount);
+                } else {
+                    return filtered
+                        .map(item => ({
+                            ...item,
+                            name: `${item.channel} - ${item.format} (${item.duration}s)`
+                        }))
+                        .sort((a, b) => b.integralIndex - a.integralIndex)
+                        .slice(0, displayCount);
+                }
+            }, [data, selectedChannels, viewMode, displayCount]);
+
+            const radarData = useMemo(() => {
+                const top5 = processedData.slice(0, 5);
+                const criteria = [
+                    { name: 'Trust', key: 'trust' },
+                    { name: 'Passive Consumption', key: 'passiveConsumption' },
+                    { name: 'Format', key: 'formatScore' },
+                    { name: 'Attention Share', key: 'attentionShare' },
+                    { name: 'Contact Time', key: 'contactTime' },
+                    { name: 'Momentary Clutter', key: 'momentaryClutter' }
+                ];
+                
+                return criteria.map(criterion => {
+                    const dataPoint = { criterion: criterion.name };
+                    top5.forEach((item, index) => {
+                        dataPoint[`item${index}`] = item[criterion.key] || 0;
+                        dataPoint[`name${index}`] = item.name.length > 20 ? item.name.substring(0, 20) + '...' : item.name;
+                    });
+                    return dataPoint;
+                });
+            }, [processedData]);
+
+            const handleChannelToggle = (channel) => {
+                setSelectedChannels(prev => 
+                    prev.includes(channel) 
+                        ? prev.filter(c => c !== channel)
+                        : [...prev, channel]
+                );
+            };
+
+            const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'];
+
+            if (loading) {
+                return React.createElement('div', {className: "flex justify-center items-center h-64"}, 'Загрузка данных...');
+            }
+
+            return React.createElement('div', {className: "max-w-7xl mx-auto p-6 space-y-6"}, [
+                React.createElement('h1', {className: "text-3xl font-bold text-center mb-8", key: 'title'}, 'Рейтинг качества медиа каналов'),
+                
+                React.createElement('div', {className: "bg-white p-6 rounded-lg shadow-md space-y-4", key: 'controls'}, [
+                    React.createElement('div', {className: "grid grid-cols-1 md:grid-cols-3 gap-4", key: 'control-grid'}, [
+                        React.createElement('div', {key: 'mode-select'}, [
+                            React.createElement('label', {className: "block text-sm font-medium mb-2"}, 'Режим отображения:'),
+                            React.createElement('select', {
+                                value: viewMode,
+                                onChange: (e) => setViewMode(e.target.value),
+                                className: "w-full p-2 border border-gray-300 rounded-md"
+                            }, [
+                                React.createElement('option', {value: 'channels', key: 'ch'}, 'Только каналы'),
+                                React.createElement('option', {value: 'channel-format', key: 'cf'}, 'Канал + Формат'),
+                                React.createElement('option', {value: 'channel-format-duration', key: 'cfd'}, 'Канал + Формат + Длительность')
+                            ])
+                        ]),
+                        
+                        React.createElement('div', {key: 'count-slider'}, [
+                            React.createElement('label', {className: "block text-sm font-medium mb-2"}, `Количество элементов: ${displayCount}`),
+                            React.createElement('input', {
+                                type: "range",
+                                min: "5",
+                                max: "30",
+                                value: displayCount,
+                                onChange: (e) => setDisplayCount(parseInt(e.target.value)),
+                                className: "w-full"
+                            })
+                        ]),
+                        
+                        React.createElement('div', {className: "flex items-center justify-center", key: 'stats'}, 
+                            React.createElement('div', {className: "text-sm text-gray-600"}, 
+                                `Показано: ${Math.min(displayCount, processedData.length)} из ${processedData.length} элементов`
+                            )
+                        )
+                    ]),
+
+                    React.createElement('div', {key: 'channel-selector'}, [
+                        React.createElement('label', {className: "block text-sm font-medium mb-2"}, 'Выберите каналы:'),
+                        React.createElement('div', {className: "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2"}, 
+                            availableChannels.map(channel => 
+                                React.createElement('label', {
+                                    key: channel, 
+                                    className: "flex items-center space-x-2 text-sm"
+                                }, [
+                                    React.createElement('input', {
+                                        type: "checkbox",
+                                        checked: selectedChannels.includes(channel),
+                                        onChange: () => handleChannelToggle(channel),
+                                        className: "rounded"
+                                    }),
+                                    React.createElement('span', {
+                                        className: "truncate", 
+                                        title: channel
+                                    }, channel)
+                                ])
+                            )
+                        )
+                    ])
+                ]),
+
+                React.createElement('div', {className: "bg-white p-6 rounded-lg shadow-md", key: 'table'}, [
+                    React.createElement('h2', {className: "text-xl font-semibold mb-4"}, 'Таблица рейтингов'),
+                    React.createElement('div', {className: "overflow-x-auto"}, 
+                        React.createElement('table', {className: "w-full text-sm"}, [
+                            React.createElement('thead', {className: "bg-gray-50"}, 
+                                React.createElement('tr', {}, [
+                                    React.createElement('th', {className: "px-3 py-2 text-left font-medium"}, 'Рейтинг'),
+                                    React.createElement('th', {className: "px-3 py-2 text-left font-medium"}, 'Название'),
+                                    React.createElement('th', {className: "px-3 py-2 text-center font-medium"}, 'Интегральный индекс')
+                                ])
+                            ),
+                            React.createElement('tbody', {}, 
+                                processedData.map((item, index) => 
+                                    React.createElement('tr', {
+                                        key: index, 
+                                        className: index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                                    }, [
+                                        React.createElement('td', {className: "px-3 py-2 font-semibold"}, index + 1),
+                                        React.createElement('td', {className: "px-3 py-2 font-medium"}, item.name),
+                                        React.createElement('td', {className: "px-3 py-2 text-center font-bold text-blue-600"}, 
+                                            item.integralIndex.toFixed(3)
+                                        )
+                                    ])
+                                )
+                            )
+                        ])
+                    )
+                ]),
+
+                React.createElement('div', {className: "grid grid-cols-1 xl:grid-cols-2 gap-6", key: 'charts'}, [
+                    React.createElement('div', {className: "bg-white p-6 rounded-lg shadow-md", key: 'bar-chart'}, [
+                        React.createElement('h2', {className: "text-xl font-semibold mb-4"}, 'Интегральные рейтинги'),
+                        React.createElement(ResponsiveContainer, {width: "100%", height: 400}, 
+                            React.createElement(BarChart, {
+                                data: processedData, 
+                                margin: { top: 20, right: 30, left: 20, bottom: 80 }
+                            }, [
+                                React.createElement(CartesianGrid, {strokeDasharray: "3 3"}),
+                                React.createElement(XAxis, {
+                                    dataKey: "name",
+                                    angle: -45,
+                                    textAnchor: "end",
+                                    height: 80,
+                                    interval: 0,
+                                    fontSize: 10
+                                }),
+                                React.createElement(YAxis, {}),
+                                React.createElement(Tooltip, {}),
+                                React.createElement(Bar, {dataKey: "integralIndex", fill: "#8884d8"})
+                            ])
+                        )
+                    ]),
+
+                    React.createElement('div', {className: "bg-white p-6 rounded-lg shadow-md", key: 'radar-chart'}, [
+                        React.createElement('h2', {className: "text-xl font-semibold mb-4"}, 'Сравнение топ-5 по критериям'),
+                        React.createElement(ResponsiveContainer, {width: "100%", height: 400}, 
+                            React.createElement(RadarChart, {data: radarData}, [
+                                React.createElement(PolarGrid, {}),
+                                React.createElement(PolarAngleAxis, {dataKey: "criterion", tick: { fontSize: 10 }}),
+                                React.createElement(PolarRadiusAxis, {angle: 30, domain: [0, 1]}),
+                                ...processedData.slice(0, 5).map((item, index) => 
+                                    React.createElement(Radar, {
+                                        key: index,
+                                        name: radarData[0] && radarData[0][`name${index}`] ? radarData[0][`name${index}`] : item.name,
+                                        dataKey: `item${index}`,
+                                        stroke: colors[index],
+                                        fill: colors[index],
+                                        fillOpacity: 0.1
+                                    })
+                                ),
+                                React.createElement(Legend, {})
+                            ])
+                        )
+                    ])
+                ]),
+
+                React.createElement('div', {className: "bg-white p-6 rounded-lg shadow-md", key: 'stats'}, [
+                    React.createElement('h2', {className: "text-xl font-semibold mb-4"}, 'Статистика'),
+                    React.createElement('div', {className: "grid grid-cols-2 md:grid-cols-4 gap-4 text-center"}, [
+                        React.createElement('div', {key: 'stat1'}, [
+                            React.createElement('div', {className: "text-2xl font-bold text-blue-600"}, selectedChannels.length),
+                            React.createElement('div', {className: "text-sm text-gray-600"}, 'Выбрано каналов')
+                        ]),
+                        React.createElement('div', {key: 'stat2'}, [
+                            React.createElement('div', {className: "text-2xl font-bold text-green-600"}, 
+                                data.filter(item => selectedChannels.includes(item.channel)).length
+                            ),
+                            React.createElement('div', {className: "text-sm text-gray-600"}, 'Всего записей')
+                        ]),
+                        React.createElement('div', {key: 'stat3'}, [
+                            React.createElement('div', {className: "text-2xl font-bold text-orange-600"}, 
+                                processedData.length > 0 ? processedData[0].integralIndex.toFixed(3) : '0'
+                            ),
+                            React.createElement('div', {className: "text-sm text-gray-600"}, 'Лучший рейтинг')
+                        ]),
+                        React.createElement('div', {key: 'stat4'}, [
+                            React.createElement('div', {className: "text-2xl font-bold text-red-600"}, 
+                                processedData.length > 0 ? 
+                                    (processedData.reduce((sum, item) => sum + item.integralIndex, 0) / processedData.length).toFixed(3) 
+                                    : '0'
+                            ),
+                            React.createElement('div', {className: "text-sm text-gray-600"}, 'Средний рейтинг')
+                        ])
+                    ])
+                ])
+            ]);
+        };
+
+        ReactDOM.render(React.createElement(MediaRatingDashboard), document.getElementById('root'));
+    </script>
+</body>
+</html>
