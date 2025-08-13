@@ -319,7 +319,7 @@
                     ctx.fillStyle = '#2c3e50';
                     ctx.font = '12px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText(item.ratingValue.toFixed(1), x + barWidth/2, y - 5);
+                    ctx.fillText(item.ratingValue.toFixed(2), x + barWidth/2, y - 5);
 
                     // Название под столбцом (сокращенное)
                     ctx.save();
@@ -857,7 +857,7 @@
                                             <td className="rank">#{index + 1}</td>
                                             <td>{item.name}</td>
                                             <td className="index-score">
-                                                {item.ratingValue.toFixed(1)}
+                                                {item.ratingValue.toFixed(2)}
                                             </td>
                                         </tr>
                                     ))}
