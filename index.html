@@ -73,6 +73,46 @@
             border-color: #3498db;
             box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
         }
+        .rating-type-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .rating-option {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+        .rating-option.selected {
+            border-color: #3498db;
+            background: #e3f2fd;
+        }
+        .rating-option:hover {
+            border-color: #3498db;
+        }
+        .rating-option input {
+            margin-right: 10px;
+            transform: scale(1.2);
+        }
+        .rating-option-label {
+            flex: 1;
+        }
+        .rating-option-title {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        .rating-option-desc {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
         .channels-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -232,7 +272,7 @@
         const { useState, useEffect, useMemo, useRef } = React;
 
         // Простой компонент для столбчатой диаграммы
-        const BarChart = ({ data, width = 600, height = 400 }) => {
+        const BarChart = ({ data, width = 600, height = 400, ratingType }) => {
             const canvasRef = useRef(null);
 
             useEffect(() => {
@@ -248,20 +288,29 @@
                 ctx.clearRect(0, 0, width, height);
 
                 // Находим максимальное значение
-                const maxValue = Math.max(...data.map(d => d.integralIndex));
+                const maxValue = Math.max(...data.map(d => d.ratingValue));
                 const barWidth = chartWidth / data.length * 0.8;
                 const barSpacing = chartWidth / data.length * 0.2;
 
                 // Рисуем столбцы
                 data.forEach((item, index) => {
-                    const barHeight = (item.integralIndex / maxValue) * chartHeight;
+                    const barHeight = (item.ratingValue / maxValue) * chartHeight;
                     const x = padding + index * (barWidth + barSpacing);
                     const y = height - padding - barHeight;
 
                     // Градиент для столбца
                     const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
-                    gradient.addColorStop(0, '#3498db');
-                    gradient.addColorStop(1, '#2980b9');
+                    
+                    if (ratingType === 'general') {
+                        gradient.addColorStop(0, '#3498db');
+                        gradient.addColorStop(1, '#2980b9');
+                    } else if (ratingType === 'brand') {
+                        gradient.addColorStop(0, '#e74c3c');
+                        gradient.addColorStop(1, '#c0392b');
+                    } else {
+                        gradient.addColorStop(0, '#2ecc71');
+                        gradient.addColorStop(1, '#27ae60');
+                    }
 
                     ctx.fillStyle = gradient;
                     ctx.fillRect(x, y, barWidth, barHeight);
@@ -270,7 +319,7 @@
                     ctx.fillStyle = '#2c3e50';
                     ctx.font = '12px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText(item.integralIndex.toFixed(3), x + barWidth/2, y - 5);
+                    ctx.fillText(item.ratingValue.toFixed(1), x + barWidth/2, y - 5);
 
                     // Название под столбцом (сокращенное)
                     ctx.save();
@@ -296,7 +345,7 @@
                 ctx.lineTo(width - padding, height - padding);
                 ctx.stroke();
 
-            }, [data, width, height]);
+            }, [data, width, height, ratingType]);
 
             return <canvas ref={canvasRef} width={width} height={height} />;
         };
@@ -454,6 +503,7 @@
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
             const [viewMode, setViewMode] = useState('channels');
+            const [ratingType, setRatingType] = useState('general');
             const [selectedChannels, setSelectedChannels] = useState([]);
             const [availableChannels, setAvailableChannels] = useState([]);
             const [displayCount, setDisplayCount] = useState(10);
@@ -461,14 +511,14 @@
             useEffect(() => {
                 const loadData = async () => {
                     try {
-                        console.log('🔄 Начинаем загрузку Excel файла...');
+                        console.log('📄 Начинаем загрузку Excel файла...');
                         
                         let response;
                         let arrayBuffer;
                         
                         try {
                             // Способ 1: обычная загрузка файла
-                            response = await fetch('./calc_mts_v18_processed.xlsx');
+                            response = await fetch('./calc_mts_v18_processed_v5.xlsx');
                             if (response.ok) {
                                 arrayBuffer = await response.arrayBuffer();
                                 console.log('✅ Файл загружен через fetch');
@@ -476,16 +526,16 @@
                                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                             }
                         } catch (fetchError) {
-                            console.log('❌ Fetch не сработал:', fetchError.message);
+                            console.log('⚠ Fetch не сработал:', fetchError.message);
                             
                             // Способ 2: через window.fs (Claude)
                             if (typeof window !== 'undefined' && window.fs && window.fs.readFile) {
-                                console.log('🔄 Пробуем window.fs.readFile...');
-                                const fileData = await window.fs.readFile('calc_mts_v18_processed.xlsx');
+                                console.log('📄 Пробуем window.fs.readFile...');
+                                const fileData = await window.fs.readFile('calc_mts_v18_processed_v5.xlsx');
                                 arrayBuffer = fileData.buffer || fileData;
                                 console.log('✅ Файл загружен через window.fs');
                             } else {
-                                throw new Error('Excel файл не найден. Убедитесь, что файл calc_mts_v18_processed.xlsx находится в той же папке что и index.html');
+                                throw new Error('Excel файл не найден. Убедитесь, что файл calc_mts_v18_processed_v5.xlsx находится в той же папке что и index.html');
                             }
                         }
                         
@@ -510,13 +560,15 @@
                             channel: row[0],
                             format: row[1], 
                             duration: row[2],
-                            trust: row[10] || 0,
-                            passiveConsumption: row[11] || 0,
-                            formatScore: row[12] || 0,
-                            attentionShare: row[13] || 0,
-                            contactTime: row[14] || 0,
-                            momentaryClutter: row[15] || 0,
-                            integralIndex: row[16] || 0
+                            trust: row[11] || 0,
+                            passiveConsumption: row[12] || 0,
+                            formatScore: row[13] || 0,
+                            attentionShare: row[14] || 0,
+                            contactTime: row[15] || 0,
+                            momentaryClutter: row[16] || 0,
+                            integralIndex: row[17] || 0,
+                            brandIndex: row[36] || 0,
+                            purchaseIndex: row[37] || 0
                         })).filter(item => item.channel && item.channel !== '');
 
                         console.log(`✅ Обработанных записей: ${processedData.length}`);
@@ -533,7 +585,7 @@
                         console.log('🎉 Данные успешно загружены!');
                         
                     } catch (error) {
-                        console.error('❌ Ошибка загрузки:', error);
+                        console.error('⚠ Ошибка загрузки:', error);
                         setError(error.message);
                         setLoading(false);
                     }
@@ -545,6 +597,14 @@
             const processedData = useMemo(() => {
                 let filtered = data.filter(item => selectedChannels.includes(item.channel));
                 
+                const getRatingValue = (item) => {
+                    switch (ratingType) {
+                        case 'brand': return item.brandIndex;
+                        case 'purchase': return item.purchaseIndex;
+                        default: return item.integralIndex;
+                    }
+                };
+                
                 if (viewMode === 'channels') {
                     // Группируем по каналам и вычисляем средние
                     const channelGroups = {};
@@ -553,6 +613,8 @@
                             channelGroups[item.channel] = {
                                 channel: item.channel,
                                 integralIndex: [],
+                                brandIndex: [],
+                                purchaseIndex: [],
                                 trust: [],
                                 passiveConsumption: [],
                                 formatScore: [],
@@ -562,6 +624,8 @@
                             };
                         }
                         channelGroups[item.channel].integralIndex.push(item.integralIndex);
+                        channelGroups[item.channel].brandIndex.push(item.brandIndex);
+                        channelGroups[item.channel].purchaseIndex.push(item.purchaseIndex);
                         channelGroups[item.channel].trust.push(item.trust);
                         channelGroups[item.channel].passiveConsumption.push(item.passiveConsumption);
                         channelGroups[item.channel].formatScore.push(item.formatScore);
@@ -570,40 +634,56 @@
                         channelGroups[item.channel].momentaryClutter.push(item.momentaryClutter);
                     });
                     
-                    const aggregated = Object.values(channelGroups).map(group => ({
-                        name: group.channel,
-                        channel: group.channel,
-                        integralIndex: group.integralIndex.reduce((a, b) => a + b, 0) / group.integralIndex.length,
-                        trust: group.trust.reduce((a, b) => a + b, 0) / group.trust.length,
-                        passiveConsumption: group.passiveConsumption.reduce((a, b) => a + b, 0) / group.passiveConsumption.length,
-                        formatScore: group.formatScore.reduce((a, b) => a + b, 0) / group.formatScore.length,
-                        attentionShare: group.attentionShare.reduce((a, b) => a + b, 0) / group.attentionShare.length,
-                        contactTime: group.contactTime.reduce((a, b) => a + b, 0) / group.contactTime.length,
-                        momentaryClutter: group.momentaryClutter.reduce((a, b) => a + b, 0) / group.momentaryClutter.length
-                    }));
+                    const aggregated = Object.values(channelGroups).map(group => {
+                        const item = {
+                            name: group.channel,
+                            channel: group.channel,
+                            integralIndex: group.integralIndex.reduce((a, b) => a + b, 0) / group.integralIndex.length,
+                            brandIndex: group.brandIndex.reduce((a, b) => a + b, 0) / group.brandIndex.length,
+                            purchaseIndex: group.purchaseIndex.reduce((a, b) => a + b, 0) / group.purchaseIndex.length,
+                            trust: group.trust.reduce((a, b) => a + b, 0) / group.trust.length,
+                            passiveConsumption: group.passiveConsumption.reduce((a, b) => a + b, 0) / group.passiveConsumption.length,
+                            formatScore: group.formatScore.reduce((a, b) => a + b, 0) / group.formatScore.length,
+                            attentionShare: group.attentionShare.reduce((a, b) => a + b, 0) / group.attentionShare.length,
+                            contactTime: group.contactTime.reduce((a, b) => a + b, 0) / group.contactTime.length,
+                            momentaryClutter: group.momentaryClutter.reduce((a, b) => a + b, 0) / group.momentaryClutter.length
+                        };
+                        item.ratingValue = getRatingValue(item);
+                        return item;
+                    });
                     
                     return aggregated
-                        .sort((a, b) => b.integralIndex - a.integralIndex)
+                        .sort((a, b) => b.ratingValue - a.ratingValue)
                         .slice(0, displayCount);
                         
                 } else if (viewMode === 'channel-format') {
-                    return filtered
-                        .map(item => ({
-                            ...item,
-                            name: `${item.channel} - ${item.format}`
-                        }))
-                        .sort((a, b) => b.integralIndex - a.integralIndex)
+                    const result = filtered
+                        .map(item => {
+                            const newItem = {
+                                ...item,
+                                name: `${item.channel} - ${item.format}`
+                            };
+                            newItem.ratingValue = getRatingValue(newItem);
+                            return newItem;
+                        })
+                        .sort((a, b) => b.ratingValue - a.ratingValue)
                         .slice(0, displayCount);
+                    return result;
                 } else {
-                    return filtered
-                        .map(item => ({
-                            ...item,
-                            name: `${item.channel} - ${item.format} (${item.duration}s)`
-                        }))
-                        .sort((a, b) => b.integralIndex - a.integralIndex)
+                    const result = filtered
+                        .map(item => {
+                            const newItem = {
+                                ...item,
+                                name: `${item.channel} - ${item.format} (${item.duration}s)`
+                            };
+                            newItem.ratingValue = getRatingValue(newItem);
+                            return newItem;
+                        })
+                        .sort((a, b) => b.ratingValue - a.ratingValue)
                         .slice(0, displayCount);
+                    return result;
                 }
-            }, [data, selectedChannels, viewMode, displayCount]);
+            }, [data, selectedChannels, viewMode, displayCount, ratingType]);
 
             const handleChannelToggle = (channel) => {
                 setSelectedChannels(prev => 
@@ -613,11 +693,19 @@
                 );
             };
 
+            const getRatingTypeLabel = () => {
+                switch (ratingType) {
+                    case 'brand': return 'Рейтинг по бренд-метрикам';
+                    case 'purchase': return 'Рейтинг по намерению покупки';
+                    default: return 'Общий интегральный рейтинг';
+                }
+            };
+
             if (loading) {
                 return (
                     <div className="loading">
                         <div style={{fontSize: '24px', marginBottom: '10px'}}>⏳ Загрузка данных...</div>
-                        <div style={{fontSize: '16px', color: '#666'}}>Читаем Excel файл calc_mts_v18_processed.xlsx</div>
+                        <div style={{fontSize: '16px', color: '#666'}}>Читаем Excel файл calc_mts_v18_processed_v5.xlsx</div>
                     </div>
                 );
             }
@@ -625,12 +713,12 @@
             if (error) {
                 return (
                     <div className="error">
-                        <h3>❌ Ошибка загрузки данных</h3>
+                        <h3>⚠ Ошибка загрузки данных</h3>
                         <p><strong>Проблема:</strong> {error}</p>
                         <div>
                             <p><strong>Возможные решения:</strong></p>
                             <ul>
-                                <li>Убедитесь что файл <code>calc_mts_v18_processed.xlsx</code> загружен в GitHub</li>
+                                <li>Убедитесь что файл <code>calc_mts_v18_processed_v5.xlsx</code> загружен в GitHub</li>
                                 <li>Файл должен быть в той же папке что и <code>index.html</code></li>
                                 <li>Проверьте точность названия файла</li>
                                 <li>Возможно нужно подождать несколько минут для обновления GitHub Pages</li>
@@ -649,6 +737,56 @@
                     
                     {/* Панель управления */}
                     <div className="card">
+                        <div className="card-title">⚙️ Настройки отображения</div>
+                        
+                        {/* Тип рейтинга */}
+                        <div>
+                            <label className="label">Тип рейтинга:</label>
+                            <div className="rating-type-selector">
+                                <label className={`rating-option ${ratingType === 'general' ? 'selected' : ''}`}>
+                                    <input
+                                        type="radio"
+                                        name="ratingType"
+                                        value="general"
+                                        checked={ratingType === 'general'}
+                                        onChange={(e) => setRatingType(e.target.value)}
+                                    />
+                                    <div className="rating-option-label">
+                                        <div className="rating-option-title">Общий рейтинг</div>
+                                        <div className="rating-option-desc">Интегральный индекс качества</div>
+                                    </div>
+                                </label>
+                                
+                                <label className={`rating-option ${ratingType === 'brand' ? 'selected' : ''}`}>
+                                    <input
+                                        type="radio"
+                                        name="ratingType"
+                                        value="brand"
+                                        checked={ratingType === 'brand'}
+                                        onChange={(e) => setRatingType(e.target.value)}
+                                    />
+                                    <div className="rating-option-label">
+                                        <div className="rating-option-title">Бренд-метрики</div>
+                                        <div className="rating-option-desc">Индекс для брендинга</div>
+                                    </div>
+                                </label>
+                                
+                                <label className={`rating-option ${ratingType === 'purchase' ? 'selected' : ''}`}>
+                                    <input
+                                        type="radio"
+                                        name="ratingType"
+                                        value="purchase"
+                                        checked={ratingType === 'purchase'}
+                                        onChange={(e) => setRatingType(e.target.value)}
+                                    />
+                                    <div className="rating-option-label">
+                                        <div className="rating-option-title">Намерение покупки</div>
+                                        <div className="rating-option-desc">Индекс для конверсии</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
                         <div className="controls">
                             <div className="control-group">
                                 <label className="label">Режим отображения:</label>
@@ -703,14 +841,14 @@
 
                     {/* Таблица рейтингов */}
                     <div className="card">
-                        <h2 className="card-title">🏆 Таблица рейтингов</h2>
+                        <h2 className="card-title">🏆 {getRatingTypeLabel()}</h2>
                         <div style={{overflowX: 'auto'}}>
                             <table className="table">
                                 <thead>
                                     <tr>
                                         <th>Рейтинг</th>
                                         <th>Название</th>
-                                        <th style={{textAlign: 'center'}}>Интегральный индекс</th>
+                                        <th style={{textAlign: 'center'}}>Значение индекса</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -719,7 +857,7 @@
                                             <td className="rank">#{index + 1}</td>
                                             <td>{item.name}</td>
                                             <td className="index-score">
-                                                {item.integralIndex.toFixed(3)}
+                                                {item.ratingValue.toFixed(1)}
                                             </td>
                                         </tr>
                                     ))}
@@ -731,9 +869,14 @@
                     {/* Графики */}
                     <div className="chart-container">
                         <div className="chart-card">
-                            <h2 className="card-title">📊 Интегральные рейтинги</h2>
+                            <h2 className="card-title">📊 {getRatingTypeLabel()}</h2>
                             <div className="canvas-container">
-                                <BarChart data={processedData} width={600} height={400} />
+                                <BarChart 
+                                    data={processedData} 
+                                    width={600} 
+                                    height={400} 
+                                    ratingType={ratingType}
+                                />
                             </div>
                         </div>
                         
@@ -763,15 +906,15 @@
                             </div>
                             <div className="stat-card orange">
                                 <div className="stat-value orange">
-                                    {processedData.length > 0 ? processedData[0].integralIndex.toFixed(3) : '0.000'}
+                                    {processedData.length > 0 ? processedData[0].ratingValue.toFixed(1) : '0.0'}
                                 </div>
                                 <div className="stat-label">Лучший рейтинг</div>
                             </div>
                             <div className="stat-card purple">
                                 <div className="stat-value purple">
                                     {processedData.length > 0 ? 
-                                        (processedData.reduce((sum, item) => sum + item.integralIndex, 0) / processedData.length).toFixed(3) 
-                                        : '0.000'}
+                                        (processedData.reduce((sum, item) => sum + item.ratingValue, 0) / processedData.length).toFixed(1) 
+                                        : '0.0'}
                                 </div>
                                 <div className="stat-label">Средний рейтинг</div>
                             </div>
