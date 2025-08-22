@@ -657,18 +657,59 @@
                         .slice(0, displayCount);
                         
                 } else if (viewMode === 'channel-format') {
-                    const result = filtered
-                        .map(item => {
-                            const newItem = {
-                                ...item,
-                                name: `${item.channel} - ${item.format}`
+                    // Группируем по каналу + формату и вычисляем средние
+                    const channelFormatGroups = {};
+                    filtered.forEach(item => {
+                        const key = `${item.channel} - ${item.format}`;
+                        if (!channelFormatGroups[key]) {
+                            channelFormatGroups[key] = {
+                                channel: item.channel,
+                                format: item.format,
+                                name: key,
+                                integralIndex: [],
+                                brandIndex: [],
+                                purchaseIndex: [],
+                                trust: [],
+                                passiveConsumption: [],
+                                formatScore: [],
+                                attentionShare: [],
+                                contactTime: [],
+                                momentaryClutter: []
                             };
-                            newItem.ratingValue = getRatingValue(newItem);
-                            return newItem;
-                        })
+                        }
+                        channelFormatGroups[key].integralIndex.push(item.integralIndex);
+                        channelFormatGroups[key].brandIndex.push(item.brandIndex);
+                        channelFormatGroups[key].purchaseIndex.push(item.purchaseIndex);
+                        channelFormatGroups[key].trust.push(item.trust);
+                        channelFormatGroups[key].passiveConsumption.push(item.passiveConsumption);
+                        channelFormatGroups[key].formatScore.push(item.formatScore);
+                        channelFormatGroups[key].attentionShare.push(item.attentionShare);
+                        channelFormatGroups[key].contactTime.push(item.contactTime);
+                        channelFormatGroups[key].momentaryClutter.push(item.momentaryClutter);
+                    });
+                    
+                    const aggregated = Object.values(channelFormatGroups).map(group => {
+                        const item = {
+                            name: group.name,
+                            channel: group.channel,
+                            format: group.format,
+                            integralIndex: group.integralIndex.reduce((a, b) => a + b, 0) / group.integralIndex.length,
+                            brandIndex: group.brandIndex.reduce((a, b) => a + b, 0) / group.brandIndex.length,
+                            purchaseIndex: group.purchaseIndex.reduce((a, b) => a + b, 0) / group.purchaseIndex.length,
+                            trust: group.trust.reduce((a, b) => a + b, 0) / group.trust.length,
+                            passiveConsumption: group.passiveConsumption.reduce((a, b) => a + b, 0) / group.passiveConsumption.length,
+                            formatScore: group.formatScore.reduce((a, b) => a + b, 0) / group.formatScore.length,
+                            attentionShare: group.attentionShare.reduce((a, b) => a + b, 0) / group.attentionShare.length,
+                            contactTime: group.contactTime.reduce((a, b) => a + b, 0) / group.contactTime.length,
+                            momentaryClutter: group.momentaryClutter.reduce((a, b) => a + b, 0) / group.momentaryClutter.length
+                        };
+                        item.ratingValue = getRatingValue(item);
+                        return item;
+                    });
+                    
+                    return aggregated
                         .sort((a, b) => b.ratingValue - a.ratingValue)
                         .slice(0, displayCount);
-                    return result;
                 } else {
                     const result = filtered
                         .map(item => {
@@ -906,15 +947,15 @@
                             </div>
                             <div className="stat-card orange">
                                 <div className="stat-value orange">
-                                    {processedData.length > 0 ? processedData[0].ratingValue.toFixed(1) : '0.0'}
+                                    {processedData.length > 0 ? processedData[0].ratingValue.toFixed(2) : '0.00'}
                                 </div>
                                 <div className="stat-label">Лучший рейтинг</div>
                             </div>
                             <div className="stat-card purple">
                                 <div className="stat-value purple">
                                     {processedData.length > 0 ? 
-                                        (processedData.reduce((sum, item) => sum + item.ratingValue, 0) / processedData.length).toFixed(1) 
-                                        : '0.0'}
+                                        (processedData.reduce((sum, item) => sum + item.ratingValue, 0) / processedData.length).toFixed(2) 
+                                        : '0.00'}
                                 </div>
                                 <div className="stat-label">Средний рейтинг</div>
                             </div>
