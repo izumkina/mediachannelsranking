@@ -271,7 +271,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // Простой компонент для столбчатой диаграммы
+        // Компонент для столбчатой диаграммы
         const BarChart = ({ data, width = 600, height = 400, ratingType }) => {
             const canvasRef = useRef(null);
 
@@ -284,21 +284,17 @@
                 const chartWidth = width - padding * 2;
                 const chartHeight = height - padding * 2;
 
-                // Очищаем canvas
                 ctx.clearRect(0, 0, width, height);
 
-                // Находим максимальное значение
                 const maxValue = Math.max(...data.map(d => d.ratingValue));
                 const barWidth = chartWidth / data.length * 0.8;
                 const barSpacing = chartWidth / data.length * 0.2;
 
-                // Рисуем столбцы
                 data.forEach((item, index) => {
                     const barHeight = (item.ratingValue / maxValue) * chartHeight;
                     const x = padding + index * (barWidth + barSpacing);
                     const y = height - padding - barHeight;
 
-                    // Градиент для столбца
                     const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
                     
                     if (ratingType === 'general') {
@@ -315,13 +311,11 @@
                     ctx.fillStyle = gradient;
                     ctx.fillRect(x, y, barWidth, barHeight);
 
-                    // Значение над столбцом
                     ctx.fillStyle = '#2c3e50';
                     ctx.font = '12px Arial';
                     ctx.textAlign = 'center';
                     ctx.fillText(item.ratingValue.toFixed(2), x + barWidth/2, y - 5);
 
-                    // Название под столбцом (сокращенное)
                     ctx.save();
                     ctx.translate(x + barWidth/2, height - padding + 15);
                     ctx.rotate(-Math.PI/4);
@@ -333,14 +327,11 @@
                     ctx.restore();
                 });
 
-                // Оси
                 ctx.strokeStyle = '#ddd';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
-                // Y-ось
                 ctx.moveTo(padding, padding);
                 ctx.lineTo(padding, height - padding);
-                // X-ось
                 ctx.moveTo(padding, height - padding);
                 ctx.lineTo(width - padding, height - padding);
                 ctx.stroke();
@@ -350,7 +341,7 @@
             return <canvas ref={canvasRef} width={width} height={height} />;
         };
 
-        // Красивая радарная диаграмма (звездочка) для топ-5
+        // Радарная диаграмма для топ-5
         const RadarChart = ({ data, width = 600, height = 400 }) => {
             const canvasRef = useRef(null);
 
@@ -363,29 +354,29 @@
                 const centerY = height / 2;
                 const maxRadius = Math.min(width, height) / 2 - 80;
 
-                // Очищаем canvas
                 ctx.clearRect(0, 0, width, height);
 
-                // Критерии оценки
                 const criteria = [
                     'Trust',
-                    'Passive Consumption', 
-                    'Format',
-                    'Attention Share',
+                    'Active Consumption', 
+                    'Format Effect',
+                    'Image Size',
                     'Contact Time',
-                    'Momentary Clutter'
+                    'Momentary Clutter',
+                    'Personalization',
+                    'Targeting Accuracy',
+                    'CJ Targeting'
                 ];
 
                 const angleStep = (Math.PI * 2) / criteria.length;
                 const colors = [
-                    '#3498db', // Синий
-                    '#2ecc71', // Зеленый  
-                    '#f39c12', // Оранжевый
-                    '#e74c3c', // Красный
-                    '#9b59b6'  // Фиолетовый
+                    '#3498db',
+                    '#2ecc71',
+                    '#f39c12',
+                    '#e74c3c',
+                    '#9b59b6'
                 ];
 
-                // Рисуем концентрические окружности (сетку)
                 ctx.strokeStyle = '#e0e0e0';
                 ctx.lineWidth = 1;
                 for (let i = 1; i <= 5; i++) {
@@ -394,7 +385,6 @@
                     ctx.stroke();
                 }
 
-                // Рисуем оси и подписи критериев
                 ctx.strokeStyle = '#ccc';
                 ctx.fillStyle = '#555';
                 ctx.font = '12px Arial';
@@ -407,19 +397,16 @@
                     const x2 = centerX + Math.cos(angle) * maxRadius;
                     const y2 = centerY + Math.sin(angle) * maxRadius;
 
-                    // Линия оси
                     ctx.beginPath();
                     ctx.moveTo(x1, y1);
                     ctx.lineTo(x2, y2);
                     ctx.stroke();
 
-                    // Подпись критерия
                     const labelX = centerX + Math.cos(angle) * (maxRadius + 20);
                     const labelY = centerY + Math.sin(angle) * (maxRadius + 20);
                     ctx.fillText(criterion, labelX, labelY + 4);
                 });
 
-                // Рисуем значения для топ-5 элементов
                 const top5 = data.slice(0, 5);
                 
                 top5.forEach((item, itemIndex) => {
@@ -431,21 +418,22 @@
                         item.formatScore || 0,
                         item.attentionShare || 0,
                         item.contactTime || 0,
-                        item.momentaryClutter || 0
+                        item.momentaryClutter || 0,
+                        item.personalization || 0,
+                        item.targetingAccuracy || 0,
+                        item.cjTargeting || 0
                     ];
 
-                    // Нормализуем значения (предполагаем что все значения от 0 до 1)
                     const points = values.map((value, index) => {
                         const angle = index * angleStep - Math.PI / 2;
-                        const radius = Math.min(value, 1) * maxRadius; // Ограничиваем максимум единицей
+                        const radius = Math.min(value, 1) * maxRadius;
                         return {
                             x: centerX + Math.cos(angle) * radius,
                             y: centerY + Math.sin(angle) * radius
                         };
                     });
 
-                    // Рисуем заливку
-                    ctx.fillStyle = colors[itemIndex] + '20'; // Добавляем прозрачность
+                    ctx.fillStyle = colors[itemIndex] + '20';
                     ctx.beginPath();
                     ctx.moveTo(points[0].x, points[0].y);
                     for (let i = 1; i < points.length; i++) {
@@ -454,12 +442,10 @@
                     ctx.closePath();
                     ctx.fill();
 
-                    // Рисуем контур
                     ctx.strokeStyle = colors[itemIndex];
                     ctx.lineWidth = 2;
                     ctx.stroke();
 
-                    // Рисуем точки
                     ctx.fillStyle = colors[itemIndex];
                     points.forEach(point => {
                         ctx.beginPath();
@@ -468,7 +454,6 @@
                     });
                 });
 
-                // Легенда
                 const legendX = 20;
                 let legendY = height - 120;
                 
@@ -481,11 +466,9 @@
                 top5.forEach((item, index) => {
                     if (index >= colors.length) return;
                     
-                    // Цветной квадратик
                     ctx.fillStyle = colors[index];
                     ctx.fillRect(legendX, legendY - 8, 12, 12);
                     
-                    // Название
                     ctx.fillStyle = '#333';
                     const shortName = item.name.length > 25 ? item.name.substring(0, 25) + '...' : item.name;
                     ctx.fillText(shortName, legendX + 20, legendY + 2);
@@ -511,81 +494,79 @@
             useEffect(() => {
                 const loadData = async () => {
                     try {
-                        console.log('📄 Начинаем загрузку Excel файла...');
+                        console.log('Начинаем загрузку Excel файла...');
                         
                         let response;
                         let arrayBuffer;
                         
                         try {
-                            // Способ 1: обычная загрузка файла
-                            response = await fetch('./calc_mts_v18_processed_v5.xlsx');
+                            response = await fetch('./calc_mts_v18_processed.xlsx');
                             if (response.ok) {
                                 arrayBuffer = await response.arrayBuffer();
-                                console.log('✅ Файл загружен через fetch');
+                                console.log('Файл загружен через fetch');
                             } else {
                                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                             }
                         } catch (fetchError) {
-                            console.log('⚠ Fetch не сработал:', fetchError.message);
+                            console.log('Fetch не сработал:', fetchError.message);
                             
-                            // Способ 2: через window.fs (Claude)
                             if (typeof window !== 'undefined' && window.fs && window.fs.readFile) {
-                                console.log('📄 Пробуем window.fs.readFile...');
-                                const fileData = await window.fs.readFile('calc_mts_v18_processed_v5.xlsx');
+                                console.log('Пробуем window.fs.readFile...');
+                                const fileData = await window.fs.readFile('calc_mts_v18_processed.xlsx');
                                 arrayBuffer = fileData.buffer || fileData;
-                                console.log('✅ Файл загружен через window.fs');
+                                console.log('Файл загружен через window.fs');
                             } else {
-                                throw new Error('Excel файл не найден. Убедитесь, что файл calc_mts_v18_processed_v5.xlsx находится в той же папке что и index.html');
+                                throw new Error('Excel файл не найден. Убедитесь, что файл calc_mts_v18_processed.xlsx находится в той же папке что и index.html');
                             }
                         }
                         
-                        console.log(`📊 Размер файла: ${arrayBuffer.byteLength} байт`);
+                        console.log(`Размер файла: ${arrayBuffer.byteLength} байт`);
                         
-                        // Парсим Excel
                         const workbook = XLSX.read(arrayBuffer, {
                             cellStyles: true,
                             cellFormulas: true,
                             cellDates: true
                         });
                         
-                        console.log('📋 Листы в файле:', workbook.SheetNames);
+                        console.log('Листы в файле:', workbook.SheetNames);
                         
                         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                         const rawData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
                         
-                        console.log(`📈 Строк данных: ${rawData.length}`);
+                        console.log(`Строк данных: ${rawData.length}`);
                         
-                        // Обрабатываем данные (пропускаем заголовок)
                         const processedData = rawData.slice(1).map((row, index) => ({
                             channel: row[0],
                             format: row[1], 
                             duration: row[2],
-                            trust: row[11] || 0,
-                            passiveConsumption: row[12] || 0,
-                            formatScore: row[13] || 0,
-                            attentionShare: row[14] || 0,
-                            contactTime: row[15] || 0,
-                            momentaryClutter: row[16] || 0,
-                            integralIndex: row[17] || 0,
-                            brandIndex: row[36] || 0,
-                            purchaseIndex: row[37] || 0
+                            trust: row[21] || 0,
+                            passiveConsumption: row[22] || 0,
+                            formatScore: row[24] || 0,
+                            attentionShare: row[25] || 0,
+                            contactTime: row[26] || 0,
+                            momentaryClutter: row[27] || 0,
+                            personalization: row[39] || 0,
+                            targetingAccuracy: row[40] || 0,
+                            cjTargeting: row[41] || 0,
+                            integralIndex: row[30] || 0,
+                            brandIndex: row[51] || 0,
+                            purchaseIndex: row[52] || 0
                         })).filter(item => item.channel && item.channel !== '');
 
-                        console.log(`✅ Обработанных записей: ${processedData.length}`);
+                        console.log(`Обработанных записей: ${processedData.length}`);
                         
                         setData(processedData);
                         
-                        // Уникальные каналы
                         const channels = [...new Set(processedData.map(item => item.channel))];
-                        console.log(`📺 Уникальных каналов: ${channels.length}`);
+                        console.log(`Уникальных каналов: ${channels.length}`);
                         setAvailableChannels(channels);
-                        setSelectedChannels(channels.slice(0, 5)); // По умолчанию первые 5
+                        setSelectedChannels(channels.slice(0, 5));
                         
                         setLoading(false);
-                        console.log('🎉 Данные успешно загружены!');
+                        console.log('Данные успешно загружены!');
                         
                     } catch (error) {
-                        console.error('⚠ Ошибка загрузки:', error);
+                        console.error('Ошибка загрузки:', error);
                         setError(error.message);
                         setLoading(false);
                     }
@@ -606,7 +587,6 @@
                 };
                 
                 if (viewMode === 'channels') {
-                    // Группируем по каналам и вычисляем средние
                     const channelGroups = {};
                     filtered.forEach(item => {
                         if (!channelGroups[item.channel]) {
@@ -620,7 +600,10 @@
                                 formatScore: [],
                                 attentionShare: [],
                                 contactTime: [],
-                                momentaryClutter: []
+                                momentaryClutter: [],
+                                personalization: [],
+                                targetingAccuracy: [],
+                                cjTargeting: []
                             };
                         }
                         channelGroups[item.channel].integralIndex.push(item.integralIndex);
@@ -632,6 +615,9 @@
                         channelGroups[item.channel].attentionShare.push(item.attentionShare);
                         channelGroups[item.channel].contactTime.push(item.contactTime);
                         channelGroups[item.channel].momentaryClutter.push(item.momentaryClutter);
+                        channelGroups[item.channel].personalization.push(item.personalization);
+                        channelGroups[item.channel].targetingAccuracy.push(item.targetingAccuracy);
+                        channelGroups[item.channel].cjTargeting.push(item.cjTargeting);
                     });
                     
                     const aggregated = Object.values(channelGroups).map(group => {
@@ -646,7 +632,10 @@
                             formatScore: group.formatScore.reduce((a, b) => a + b, 0) / group.formatScore.length,
                             attentionShare: group.attentionShare.reduce((a, b) => a + b, 0) / group.attentionShare.length,
                             contactTime: group.contactTime.reduce((a, b) => a + b, 0) / group.contactTime.length,
-                            momentaryClutter: group.momentaryClutter.reduce((a, b) => a + b, 0) / group.momentaryClutter.length
+                            momentaryClutter: group.momentaryClutter.reduce((a, b) => a + b, 0) / group.momentaryClutter.length,
+                            personalization: group.personalization.reduce((a, b) => a + b, 0) / group.personalization.length,
+                            targetingAccuracy: group.targetingAccuracy.reduce((a, b) => a + b, 0) / group.targetingAccuracy.length,
+                            cjTargeting: group.cjTargeting.reduce((a, b) => a + b, 0) / group.cjTargeting.length
                         };
                         item.ratingValue = getRatingValue(item);
                         return item;
@@ -657,7 +646,6 @@
                         .slice(0, displayCount);
                         
                 } else if (viewMode === 'channel-format') {
-                    // Группируем по каналу + формату и вычисляем средние
                     const channelFormatGroups = {};
                     filtered.forEach(item => {
                         const key = `${item.channel} - ${item.format}`;
@@ -674,7 +662,10 @@
                                 formatScore: [],
                                 attentionShare: [],
                                 contactTime: [],
-                                momentaryClutter: []
+                                momentaryClutter: [],
+                                personalization: [],
+                                targetingAccuracy: [],
+                                cjTargeting: []
                             };
                         }
                         channelFormatGroups[key].integralIndex.push(item.integralIndex);
@@ -686,6 +677,9 @@
                         channelFormatGroups[key].attentionShare.push(item.attentionShare);
                         channelFormatGroups[key].contactTime.push(item.contactTime);
                         channelFormatGroups[key].momentaryClutter.push(item.momentaryClutter);
+                        channelFormatGroups[key].personalization.push(item.personalization);
+                        channelFormatGroups[key].targetingAccuracy.push(item.targetingAccuracy);
+                        channelFormatGroups[key].cjTargeting.push(item.cjTargeting);
                     });
                     
                     const aggregated = Object.values(channelFormatGroups).map(group => {
@@ -701,7 +695,10 @@
                             formatScore: group.formatScore.reduce((a, b) => a + b, 0) / group.formatScore.length,
                             attentionShare: group.attentionShare.reduce((a, b) => a + b, 0) / group.attentionShare.length,
                             contactTime: group.contactTime.reduce((a, b) => a + b, 0) / group.contactTime.length,
-                            momentaryClutter: group.momentaryClutter.reduce((a, b) => a + b, 0) / group.momentaryClutter.length
+                            momentaryClutter: group.momentaryClutter.reduce((a, b) => a + b, 0) / group.momentaryClutter.length,
+                            personalization: group.personalization.reduce((a, b) => a + b, 0) / group.personalization.length,
+                            targetingAccuracy: group.targetingAccuracy.reduce((a, b) => a + b, 0) / group.targetingAccuracy.length,
+                            cjTargeting: group.cjTargeting.reduce((a, b) => a + b, 0) / group.cjTargeting.length
                         };
                         item.ratingValue = getRatingValue(item);
                         return item;
@@ -745,8 +742,8 @@
             if (loading) {
                 return (
                     <div className="loading">
-                        <div style={{fontSize: '24px', marginBottom: '10px'}}>⏳ Загрузка данных...</div>
-                        <div style={{fontSize: '16px', color: '#666'}}>Читаем Excel файл calc_mts_v18_processed_v5.xlsx</div>
+                        <div style={{fontSize: '24px', marginBottom: '10px'}}>Загрузка данных...</div>
+                        <div style={{fontSize: '16px', color: '#666'}}>Читаем Excel файл calc_mts_v18_processed.xlsx</div>
                     </div>
                 );
             }
@@ -754,19 +751,19 @@
             if (error) {
                 return (
                     <div className="error">
-                        <h3>⚠ Ошибка загрузки данных</h3>
+                        <h3>Ошибка загрузки данных</h3>
                         <p><strong>Проблема:</strong> {error}</p>
                         <div>
                             <p><strong>Возможные решения:</strong></p>
                             <ul>
-                                <li>Убедитесь что файл <code>calc_mts_v18_processed_v5.xlsx</code> загружен в GitHub</li>
+                                <li>Убедитесь что файл <code>calc_mts_v18_processed.xlsx</code> загружен в GitHub</li>
                                 <li>Файл должен быть в той же папке что и <code>index.html</code></li>
                                 <li>Проверьте точность названия файла</li>
                                 <li>Возможно нужно подождать несколько минут для обновления GitHub Pages</li>
                             </ul>
                         </div>
                         <button className="btn" onClick={() => window.location.reload()}>
-                            🔄 Попробовать снова
+                            Попробовать снова
                         </button>
                     </div>
                 );
@@ -774,13 +771,11 @@
 
             return (
                 <div className="container">
-                    <h1 className="title">📊 Рейтинг качества медиа каналов</h1>
+                    <h1 className="title">Рейтинг качества медиа каналов</h1>
                     
-                    {/* Панель управления */}
                     <div className="card">
-                        <div className="card-title">⚙️ Настройки отображения</div>
+                        <div className="card-title">Настройки отображения</div>
                         
-                        {/* Тип рейтинга */}
                         <div>
                             <label className="label">Тип рейтинга:</label>
                             <div className="rating-type-selector">
@@ -880,9 +875,8 @@
                         </div>
                     </div>
 
-                    {/* Таблица рейтингов */}
                     <div className="card">
-                        <h2 className="card-title">🏆 {getRatingTypeLabel()}</h2>
+                        <h2 className="card-title">{getRatingTypeLabel()}</h2>
                         <div style={{overflowX: 'auto'}}>
                             <table className="table">
                                 <thead>
@@ -907,10 +901,9 @@
                         </div>
                     </div>
 
-                    {/* Графики */}
                     <div className="chart-container">
                         <div className="chart-card">
-                            <h2 className="card-title">📊 {getRatingTypeLabel()}</h2>
+                            <h2 className="card-title">{getRatingTypeLabel()}</h2>
                             <div className="canvas-container">
                                 <BarChart 
                                     data={processedData} 
@@ -922,16 +915,15 @@
                         </div>
                         
                         <div className="chart-card">
-                            <h2 className="card-title">⭐ Сравнение топ-5 по критериям</h2>
+                            <h2 className="card-title">Сравнение топ-5 по критериям</h2>
                             <div className="canvas-container">
                                 <RadarChart data={processedData} width={600} height={400} />
                             </div>
                         </div>
                     </div>
 
-                    {/* Статистика */}
                     <div className="card">
-                        <h2 className="card-title">📈 Статистика</h2>
+                        <h2 className="card-title">Статистика</h2>
                         <div className="stats-grid">
                             <div className="stat-card blue">
                                 <div className="stat-value blue">
