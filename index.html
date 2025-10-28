@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Рейтинг качества медиа каналов</title>
+    <title>Калькулятор эффективности медиа каналов v9</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
             margin: 0;
@@ -16,38 +17,62 @@
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #f5f5f5;
-            color: #333;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             padding: 20px;
         }
-        .title {
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .header {
             text-align: center;
-            font-size: 32px;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .title {
+            font-size: 38px;
             font-weight: bold;
-            margin-bottom: 30px;
-            color: #2c3e50;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #6b7280;
+            font-size: 16px;
+            margin-top: 10px;
         }
         .card {
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
             padding: 25px;
             margin-bottom: 25px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
         }
         .card-title {
             font-size: 20px;
             font-weight: 600;
             margin-bottom: 20px;
-            color: #2c3e50;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         .controls {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
             margin-bottom: 20px;
         }
@@ -59,669 +84,685 @@
             font-weight: 600;
             margin-bottom: 8px;
             font-size: 14px;
-            color: #555;
+            color: #4b5563;
         }
         .select, .range-input {
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
             font-size: 14px;
-            transition: border-color 0.2s;
+            transition: all 0.2s;
+            background: white;
         }
         .select:focus, .range-input:focus {
             outline: none;
-            border-color: #3498db;
-            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .mode-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .mode-option {
+            padding: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            background: white;
+            font-weight: 500;
+        }
+        .mode-option:hover {
+            border-color: #a78bfa;
+            background: #f9fafb;
+        }
+        .mode-option.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            color: #667eea;
+            font-weight: 600;
         }
         .rating-type-selector {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 15px;
             margin-bottom: 20px;
         }
         .rating-option {
-            display: flex;
-            align-items: center;
-            padding: 12px;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
+            padding: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
             cursor: pointer;
             transition: all 0.2s;
             background: white;
-        }
-        .rating-option.selected {
-            border-color: #3498db;
-            background: #e3f2fd;
-        }
-        .rating-option:hover {
-            border-color: #3498db;
-        }
-        .rating-option input {
-            margin-right: 10px;
-            transform: scale(1.2);
-        }
-        .rating-option-label {
-            flex: 1;
-        }
-        .rating-option-title {
-            font-weight: 600;
-            color: #2c3e50;
-            font-size: 14px;
-        }
-        .rating-option-desc {
-            font-size: 12px;
-            color: #666;
-            margin-top: 2px;
-        }
-        .channels-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
-            margin-top: 15px;
-        }
-        .checkbox-label {
             display: flex;
             align-items: center;
-            font-size: 13px;
-            cursor: pointer;
-            padding: 8px;
+            gap: 10px;
+        }
+        .rating-option:hover {
+            border-color: #a78bfa;
+        }
+        .rating-option.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        }
+        .rating-option input {
+            accent-color: #667eea;
+        }
+        .channel-selector {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px;
+            background: #fafafa;
+        }
+        .channel-item {
+            padding: 8px 12px;
+            margin: 4px 0;
+            background: white;
             border-radius: 6px;
-            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            transition: all 0.2s;
+            cursor: pointer;
         }
-        .checkbox-label:hover {
-            background-color: #f8f9fa;
+        .channel-item:hover {
+            background: #f3f4f6;
         }
-        .checkbox {
-            margin-right: 8px;
-            transform: scale(1.1);
+        .channel-item input {
+            margin-right: 10px;
+            accent-color: #667eea;
         }
-        .table {
+        .select-all-btn {
+            padding: 8px 16px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .select-all-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        table {
             width: 100%;
             border-collapse: collapse;
             font-size: 14px;
         }
-        .table th {
-            background-color: #f8f9fa;
-            padding: 12px 8px;
+        th {
+            background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+            padding: 12px;
             text-align: left;
             font-weight: 600;
-            color: #555;
-            border-bottom: 2px solid #e9ecef;
+            color: #374151;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
-        .table td {
-            padding: 12px 8px;
-            border-bottom: 1px solid #e9ecef;
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
         }
-        .table tbody tr:hover {
-            background-color: #f8f9fa;
-        }
-        .table tbody tr:nth-child(even) {
-            background-color: #fdfdfd;
-        }
-        .rank {
-            font-weight: bold;
-            color: #3498db;
-        }
-        .index-score {
-            font-weight: bold;
-            color: #27ae60;
-            text-align: center;
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-        }
-        .stat-card {
-            text-align: center;
-            padding: 20px;
-            border-radius: 8px;
-            border-left: 4px solid;
-        }
-        .stat-card.blue { background: #e3f2fd; border-color: #2196f3; }
-        .stat-card.green { background: #e8f5e8; border-color: #4caf50; }
-        .stat-card.orange { background: #fff3e0; border-color: #ff9800; }
-        .stat-card.purple { background: #f3e5f5; border-color: #9c27b0; }
-        .stat-value {
-            font-size: 28px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .stat-value.blue { color: #2196f3; }
-        .stat-value.green { color: #4caf50; }
-        .stat-value.orange { color: #ff9800; }
-        .stat-value.purple { color: #9c27b0; }
-        .stat-label {
-            font-size: 14px;
-            color: #666;
+        tr:hover {
+            background: #f9fafb;
         }
         .chart-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-            gap: 25px;
-        }
-        .chart-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            padding: 25px;
-        }
-        .canvas-container {
             position: relative;
             height: 400px;
-            margin: 20px 0;
+            margin-top: 20px;
         }
-        canvas {
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
         }
-        .loading, .error {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            flex-direction: column;
+        .metric-card {
+            background: linear-gradient(135deg, #f3f4f6, white);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+        }
+        .metric-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .metric-label {
+            font-size: 14px;
+            color: #6b7280;
         }
         .loading {
-            font-size: 20px;
-            color: #666;
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #6b7280;
         }
         .error {
-            background: #ffe6e6;
-            color: #d32f2f;
-            padding: 30px;
-            border-radius: 12px;
-            max-width: 600px;
-            margin: 20px;
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c00;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
         }
-        .error h3 {
-            font-size: 24px;
-            margin-bottom: 15px;
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
         }
-        .error ul {
-            text-align: left;
-            margin: 15px 0;
-        }
-        .btn {
-            background: #3498db;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            cursor: pointer;
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 20px;
             font-size: 14px;
-            font-weight: 600;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+        .info-box {
+            background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #4c1d95;
+        }
+        .factor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
             margin-top: 15px;
-            transition: background-color 0.2s;
         }
-        .btn:hover {
-            background: #2980b9;
+        .factor-item {
+            background: #f9fafb;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            font-size: 13px;
         }
-        .info-text {
-            font-size: 14px;
-            color: #666;
-            text-align: center;
-            margin-top: 10px;
+        .factor-label {
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 5px;
+        }
+        .factor-value {
+            color: #111827;
+            font-size: 16px;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <div id="root"></div>
-
+    
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo } = React;
 
-        // Компонент для столбчатой диаграммы
-        const BarChart = ({ data, width = 600, height = 400, ratingType }) => {
-            const canvasRef = useRef(null);
-
-            useEffect(() => {
-                const canvas = canvasRef.current;
-                if (!canvas || !data || data.length === 0) return;
-
-                const ctx = canvas.getContext('2d');
-                const padding = 60;
-                const chartWidth = width - padding * 2;
-                const chartHeight = height - padding * 2;
-
-                ctx.clearRect(0, 0, width, height);
-
-                const maxValue = Math.max(...data.map(d => d.ratingValue));
-                const barWidth = chartWidth / data.length * 0.8;
-                const barSpacing = chartWidth / data.length * 0.2;
-
-                data.forEach((item, index) => {
-                    const barHeight = (item.ratingValue / maxValue) * chartHeight;
-                    const x = padding + index * (barWidth + barSpacing);
-                    const y = height - padding - barHeight;
-
-                    const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
-                    
-                    if (ratingType === 'general') {
-                        gradient.addColorStop(0, '#3498db');
-                        gradient.addColorStop(1, '#2980b9');
-                    } else if (ratingType === 'brand') {
-                        gradient.addColorStop(0, '#e74c3c');
-                        gradient.addColorStop(1, '#c0392b');
-                    } else {
-                        gradient.addColorStop(0, '#2ecc71');
-                        gradient.addColorStop(1, '#27ae60');
-                    }
-
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(x, y, barWidth, barHeight);
-
-                    ctx.fillStyle = '#2c3e50';
-                    ctx.font = '12px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(item.ratingValue.toFixed(2), x + barWidth/2, y - 5);
-
-                    ctx.save();
-                    ctx.translate(x + barWidth/2, height - padding + 15);
-                    ctx.rotate(-Math.PI/4);
-                    ctx.textAlign = 'right';
-                    ctx.fillStyle = '#666';
-                    ctx.font = '10px Arial';
-                    const shortName = item.name.length > 15 ? item.name.substring(0, 15) + '...' : item.name;
-                    ctx.fillText(shortName, 0, 0);
-                    ctx.restore();
-                });
-
-                ctx.strokeStyle = '#ddd';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(padding, padding);
-                ctx.lineTo(padding, height - padding);
-                ctx.moveTo(padding, height - padding);
-                ctx.lineTo(width - padding, height - padding);
-                ctx.stroke();
-
-            }, [data, width, height, ratingType]);
-
-            return <canvas ref={canvasRef} width={width} height={height} />;
-        };
-
-        // Радарная диаграмма для топ-5
-        const RadarChart = ({ data, width = 600, height = 400 }) => {
-            const canvasRef = useRef(null);
-
-            useEffect(() => {
-                const canvas = canvasRef.current;
-                if (!canvas || !data || data.length === 0) return;
-
-                const ctx = canvas.getContext('2d');
-                const centerX = width / 2;
-                const centerY = height / 2;
-                const maxRadius = Math.min(width, height) / 2 - 80;
-
-                ctx.clearRect(0, 0, width, height);
-
-                const criteria = [
-                    'Trust',
-                    'Active Consumption', 
-                    'Format Effect',
-                    'Image Size',
-                    'Contact Time',
-                    'Momentary Clutter',
-                    'Personalization',
-                    'Targeting Accuracy',
-                    'CJ Targeting'
-                ];
-
-                const angleStep = (Math.PI * 2) / criteria.length;
-                const colors = [
-                    '#3498db',
-                    '#2ecc71',
-                    '#f39c12',
-                    '#e74c3c',
-                    '#9b59b6'
-                ];
-
-                ctx.strokeStyle = '#e0e0e0';
-                ctx.lineWidth = 1;
-                for (let i = 1; i <= 5; i++) {
-                    ctx.beginPath();
-                    ctx.arc(centerX, centerY, (maxRadius * i) / 5, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-
-                ctx.strokeStyle = '#ccc';
-                ctx.fillStyle = '#555';
-                ctx.font = '12px Arial';
-                ctx.textAlign = 'center';
-
-                criteria.forEach((criterion, index) => {
-                    const angle = index * angleStep - Math.PI / 2;
-                    const x1 = centerX;
-                    const y1 = centerY;
-                    const x2 = centerX + Math.cos(angle) * maxRadius;
-                    const y2 = centerY + Math.sin(angle) * maxRadius;
-
-                    ctx.beginPath();
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    ctx.stroke();
-
-                    const labelX = centerX + Math.cos(angle) * (maxRadius + 20);
-                    const labelY = centerY + Math.sin(angle) * (maxRadius + 20);
-                    ctx.fillText(criterion, labelX, labelY + 4);
-                });
-
-                const top5 = data.slice(0, 5);
-                
-                top5.forEach((item, itemIndex) => {
-                    if (itemIndex >= colors.length) return;
-                    
-                    const values = [
-                        item.trust || 0,
-                        item.passiveConsumption || 0,
-                        item.formatScore || 0,
-                        item.attentionShare || 0,
-                        item.contactTime || 0,
-                        item.momentaryClutter || 0,
-                        item.personalization || 0,
-                        item.targetingAccuracy || 0,
-                        item.cjTargeting || 0
-                    ];
-
-                    const points = values.map((value, index) => {
-                        const angle = index * angleStep - Math.PI / 2;
-                        const radius = Math.min(value, 1) * maxRadius;
-                        return {
-                            x: centerX + Math.cos(angle) * radius,
-                            y: centerY + Math.sin(angle) * radius
-                        };
-                    });
-
-                    ctx.fillStyle = colors[itemIndex] + '20';
-                    ctx.beginPath();
-                    ctx.moveTo(points[0].x, points[0].y);
-                    for (let i = 1; i < points.length; i++) {
-                        ctx.lineTo(points[i].x, points[i].y);
-                    }
-                    ctx.closePath();
-                    ctx.fill();
-
-                    ctx.strokeStyle = colors[itemIndex];
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-
-                    ctx.fillStyle = colors[itemIndex];
-                    points.forEach(point => {
-                        ctx.beginPath();
-                        ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
-                        ctx.fill();
-                    });
-                });
-
-                const legendX = 20;
-                let legendY = height - 120;
-                
-                ctx.font = '12px Arial';
-                ctx.textAlign = 'left';
-                ctx.fillStyle = '#333';
-                ctx.fillText('Легенда:', legendX, legendY);
-                legendY += 20;
-
-                top5.forEach((item, index) => {
-                    if (index >= colors.length) return;
-                    
-                    ctx.fillStyle = colors[index];
-                    ctx.fillRect(legendX, legendY - 8, 12, 12);
-                    
-                    ctx.fillStyle = '#333';
-                    const shortName = item.name.length > 25 ? item.name.substring(0, 25) + '...' : item.name;
-                    ctx.fillText(shortName, legendX + 20, legendY + 2);
-                    legendY += 18;
-                });
-
-            }, [data, width, height]);
-
-            return <canvas ref={canvasRef} width={width} height={height} />;
-        };
-
-        // Главный компонент
-        const MediaRatingDashboard = () => {
+        const MediaCalculator = () => {
             const [data, setData] = useState([]);
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
             const [viewMode, setViewMode] = useState('channels');
-            const [ratingType, setRatingType] = useState('general');
             const [selectedChannels, setSelectedChannels] = useState([]);
             const [availableChannels, setAvailableChannels] = useState([]);
-            const [displayCount, setDisplayCount] = useState(10);
+            const [displayCount, setDisplayCount] = useState(20);
+            const [ratingType, setRatingType] = useState('brand');
+            const [charts, setCharts] = useState({});
 
             useEffect(() => {
-                const loadData = async () => {
-                    try {
-                        console.log('Начинаем загрузку Excel файла...');
-                        
-                        let response;
-                        let arrayBuffer;
-                        
-                        try {
-                            response = await fetch('./calc_mts_v18_processed.xlsx');
-                            if (response.ok) {
-                                arrayBuffer = await response.arrayBuffer();
-                                console.log('Файл загружен через fetch');
-                            } else {
-                                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                            }
-                        } catch (fetchError) {
-                            console.log('Fetch не сработал:', fetchError.message);
-                            
-                            if (typeof window !== 'undefined' && window.fs && window.fs.readFile) {
-                                console.log('Пробуем window.fs.readFile...');
-                                const fileData = await window.fs.readFile('calc_mts_v18_processed.xlsx');
-                                arrayBuffer = fileData.buffer || fileData;
-                                console.log('Файл загружен через window.fs');
-                            } else {
-                                throw new Error('Excel файл не найден. Убедитесь, что файл calc_mts_v18_processed.xlsx находится в той же папке что и index.html');
-                            }
-                        }
-                        
-                        console.log(`Размер файла: ${arrayBuffer.byteLength} байт`);
-                        
-                        const workbook = XLSX.read(arrayBuffer, {
-                            cellStyles: true,
-                            cellFormulas: true,
-                            cellDates: true
-                        });
-                        
-                        console.log('Листы в файле:', workbook.SheetNames);
-                        
-                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                        const rawData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
-                        
-                        console.log(`Строк данных: ${rawData.length}`);
-                        
-                        const processedData = rawData.slice(1).map((row, index) => ({
-                            channel: row[0],
-                            format: row[1], 
-                            duration: row[2],
-                            trust: row[21] || 0,
-                            passiveConsumption: row[22] || 0,
-                            formatScore: row[24] || 0,
-                            attentionShare: row[25] || 0,
-                            contactTime: row[26] || 0,
-                            momentaryClutter: row[27] || 0,
-                            personalization: row[39] || 0,
-                            targetingAccuracy: row[40] || 0,
-                            cjTargeting: row[41] || 0,
-                            integralIndex: row[30] || 0,
-                            brandIndex: row[51] || 0,
-                            purchaseIndex: row[52] || 0
-                        })).filter(item => item.channel && item.channel !== '');
-
-                        console.log(`Обработанных записей: ${processedData.length}`);
-                        
-                        setData(processedData);
-                        
-                        const channels = [...new Set(processedData.map(item => item.channel))];
-                        console.log(`Уникальных каналов: ${channels.length}`);
-                        setAvailableChannels(channels);
-                        setSelectedChannels(channels.slice(0, 5));
-                        
-                        setLoading(false);
-                        console.log('Данные успешно загружены!');
-                        
-                    } catch (error) {
-                        console.error('Ошибка загрузки:', error);
-                        setError(error.message);
-                        setLoading(false);
-                    }
-                };
-                
                 loadData();
             }, []);
 
+            const loadData = async () => {
+                try {
+                    setLoading(true);
+                    console.log('Начинаю загрузку данных...');
+                    
+                    const response = await fetch('./calc_mts_v18_processed_v9_int.xlsx');
+                    if (!response.ok) {
+                        throw new Error(`Ошибка загрузки файла: ${response.status}`);
+                    }
+                    
+                    const arrayBuffer = await response.arrayBuffer();
+                    console.log(`Файл загружен: ${arrayBuffer.byteLength} байт`);
+                    
+                    const workbook = XLSX.read(arrayBuffer, {
+                        cellStyles: true,
+                        cellFormulas: true,
+                        cellDates: true
+                    });
+                    
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rawData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+                    
+                    // Маппинг колонок на индексы
+                    const columnMapping = {
+                        channel: 0,           // A
+                        format: 1,            // B
+                        duration: 2,          // C
+                        formatStrength: 18,   // S
+                        visualShare: 23,      // X
+                        contactDuration: 32,  // AG
+                        contactShare: 34,     // AI
+                        momentClutter: 43,    // AR
+                        trust: 52,            // BA
+                        channelClutter: 55,   // BD
+                        qualityIndex: 60,     // BI
+                        relevanceIndex: 61,   // BJ
+                        frequencyIndex: 62,   // BK
+                        brandEfficiency: 67,  // BP
+                        purchaseEfficiency: 68 // BQ
+                    };
+
+                    const processedData = rawData.slice(1).map((row, index) => ({
+                        id: index,
+                        channel: row[columnMapping.channel] || '',
+                        format: row[columnMapping.format] || '',
+                        duration: row[columnMapping.duration] || null,
+                        // Входные факторы
+                        formatStrength: parseFloat(row[columnMapping.formatStrength]) || 0,
+                        visualShare: parseFloat(row[columnMapping.visualShare]) || 0,
+                        contactDuration: parseFloat(row[columnMapping.contactDuration]) || 0,
+                        contactShare: parseFloat(row[columnMapping.contactShare]) || 0,
+                        momentClutter: parseFloat(row[columnMapping.momentClutter]) || 0,
+                        trust: parseFloat(row[columnMapping.trust]) || 0,
+                        channelClutter: parseFloat(row[columnMapping.channelClutter]) || 0,
+                        // Промежуточные индексы
+                        qualityIndex: parseFloat(row[columnMapping.qualityIndex]) || 0,
+                        relevanceIndex: parseFloat(row[columnMapping.relevanceIndex]) || 0,
+                        frequencyIndex: parseFloat(row[columnMapping.frequencyIndex]) || 0,
+                        // Интегральные показатели
+                        brandEfficiency: parseFloat(row[columnMapping.brandEfficiency]) || 0,
+                        purchaseEfficiency: parseFloat(row[columnMapping.purchaseEfficiency]) || 0
+                    })).filter(item => item.channel && item.channel !== '');
+
+                    console.log(`Обработано записей: ${processedData.length}`);
+                    
+                    setData(processedData);
+                    
+                    const channels = [...new Set(processedData.map(item => item.channel))];
+                    setAvailableChannels(channels);
+                    setSelectedChannels(channels.slice(0, 10));
+                    
+                    setLoading(false);
+                } catch (error) {
+                    console.error('Ошибка загрузки:', error);
+                    setError(error.message);
+                    setLoading(false);
+                }
+            };
+
             const processedData = useMemo(() => {
+                if (!data.length) return [];
+                
                 let filtered = data.filter(item => selectedChannels.includes(item.channel));
                 
                 const getRatingValue = (item) => {
-                    switch (ratingType) {
-                        case 'brand': return item.brandIndex;
-                        case 'purchase': return item.purchaseIndex;
-                        default: return item.integralIndex;
-                    }
+                    return ratingType === 'brand' ? item.brandEfficiency : item.purchaseEfficiency;
                 };
                 
                 if (viewMode === 'channels') {
-                    const channelGroups = {};
+                    // Группировка по каналам
+                    const grouped = {};
                     filtered.forEach(item => {
-                        if (!channelGroups[item.channel]) {
-                            channelGroups[item.channel] = {
-                                channel: item.channel,
-                                integralIndex: [],
-                                brandIndex: [],
-                                purchaseIndex: [],
-                                trust: [],
-                                passiveConsumption: [],
-                                formatScore: [],
-                                attentionShare: [],
-                                contactTime: [],
-                                momentaryClutter: [],
-                                personalization: [],
-                                targetingAccuracy: [],
-                                cjTargeting: []
-                            };
+                        if (!grouped[item.channel]) {
+                            grouped[item.channel] = [];
                         }
-                        channelGroups[item.channel].integralIndex.push(item.integralIndex);
-                        channelGroups[item.channel].brandIndex.push(item.brandIndex);
-                        channelGroups[item.channel].purchaseIndex.push(item.purchaseIndex);
-                        channelGroups[item.channel].trust.push(item.trust);
-                        channelGroups[item.channel].passiveConsumption.push(item.passiveConsumption);
-                        channelGroups[item.channel].formatScore.push(item.formatScore);
-                        channelGroups[item.channel].attentionShare.push(item.attentionShare);
-                        channelGroups[item.channel].contactTime.push(item.contactTime);
-                        channelGroups[item.channel].momentaryClutter.push(item.momentaryClutter);
-                        channelGroups[item.channel].personalization.push(item.personalization);
-                        channelGroups[item.channel].targetingAccuracy.push(item.targetingAccuracy);
-                        channelGroups[item.channel].cjTargeting.push(item.cjTargeting);
+                        grouped[item.channel].push(item);
                     });
                     
-                    const aggregated = Object.values(channelGroups).map(group => {
-                        const item = {
-                            name: group.channel,
-                            channel: group.channel,
-                            integralIndex: group.integralIndex.reduce((a, b) => a + b, 0) / group.integralIndex.length,
-                            brandIndex: group.brandIndex.reduce((a, b) => a + b, 0) / group.brandIndex.length,
-                            purchaseIndex: group.purchaseIndex.reduce((a, b) => a + b, 0) / group.purchaseIndex.length,
-                            trust: group.trust.reduce((a, b) => a + b, 0) / group.trust.length,
-                            passiveConsumption: group.passiveConsumption.reduce((a, b) => a + b, 0) / group.passiveConsumption.length,
-                            formatScore: group.formatScore.reduce((a, b) => a + b, 0) / group.formatScore.length,
-                            attentionShare: group.attentionShare.reduce((a, b) => a + b, 0) / group.attentionShare.length,
-                            contactTime: group.contactTime.reduce((a, b) => a + b, 0) / group.contactTime.length,
-                            momentaryClutter: group.momentaryClutter.reduce((a, b) => a + b, 0) / group.momentaryClutter.length,
-                            personalization: group.personalization.reduce((a, b) => a + b, 0) / group.personalization.length,
-                            targetingAccuracy: group.targetingAccuracy.reduce((a, b) => a + b, 0) / group.targetingAccuracy.length,
-                            cjTargeting: group.cjTargeting.reduce((a, b) => a + b, 0) / group.cjTargeting.length
+                    return Object.entries(grouped).map(([channel, items]) => {
+                        const avgItem = {
+                            name: channel,
+                            channel: channel,
+                            // Усредняем все показатели
+                            formatStrength: items.reduce((sum, item) => sum + item.formatStrength, 0) / items.length,
+                            visualShare: items.reduce((sum, item) => sum + item.visualShare, 0) / items.length,
+                            contactDuration: items.reduce((sum, item) => sum + item.contactDuration, 0) / items.length,
+                            contactShare: items.reduce((sum, item) => sum + item.contactShare, 0) / items.length,
+                            momentClutter: items.reduce((sum, item) => sum + item.momentClutter, 0) / items.length,
+                            trust: items.reduce((sum, item) => sum + item.trust, 0) / items.length,
+                            channelClutter: items.reduce((sum, item) => sum + item.channelClutter, 0) / items.length,
+                            qualityIndex: items.reduce((sum, item) => sum + item.qualityIndex, 0) / items.length,
+                            relevanceIndex: items.reduce((sum, item) => sum + item.relevanceIndex, 0) / items.length,
+                            frequencyIndex: items.reduce((sum, item) => sum + item.frequencyIndex, 0) / items.length,
+                            brandEfficiency: items.reduce((sum, item) => sum + item.brandEfficiency, 0) / items.length,
+                            purchaseEfficiency: items.reduce((sum, item) => sum + item.purchaseEfficiency, 0) / items.length
                         };
-                        item.ratingValue = getRatingValue(item);
-                        return item;
-                    });
+                        avgItem.ratingValue = getRatingValue(avgItem);
+                        return avgItem;
+                    }).sort((a, b) => b.ratingValue - a.ratingValue).slice(0, displayCount);
                     
-                    return aggregated
-                        .sort((a, b) => b.ratingValue - a.ratingValue)
-                        .slice(0, displayCount);
-                        
                 } else if (viewMode === 'channel-format') {
-                    const channelFormatGroups = {};
+                    // Группировка по каналу и формату
+                    const grouped = {};
                     filtered.forEach(item => {
                         const key = `${item.channel} - ${item.format}`;
-                        if (!channelFormatGroups[key]) {
-                            channelFormatGroups[key] = {
-                                channel: item.channel,
-                                format: item.format,
-                                name: key,
-                                integralIndex: [],
-                                brandIndex: [],
-                                purchaseIndex: [],
-                                trust: [],
-                                passiveConsumption: [],
-                                formatScore: [],
-                                attentionShare: [],
-                                contactTime: [],
-                                momentaryClutter: [],
-                                personalization: [],
-                                targetingAccuracy: [],
-                                cjTargeting: []
-                            };
+                        if (!grouped[key]) {
+                            grouped[key] = [];
                         }
-                        channelFormatGroups[key].integralIndex.push(item.integralIndex);
-                        channelFormatGroups[key].brandIndex.push(item.brandIndex);
-                        channelFormatGroups[key].purchaseIndex.push(item.purchaseIndex);
-                        channelFormatGroups[key].trust.push(item.trust);
-                        channelFormatGroups[key].passiveConsumption.push(item.passiveConsumption);
-                        channelFormatGroups[key].formatScore.push(item.formatScore);
-                        channelFormatGroups[key].attentionShare.push(item.attentionShare);
-                        channelFormatGroups[key].contactTime.push(item.contactTime);
-                        channelFormatGroups[key].momentaryClutter.push(item.momentaryClutter);
-                        channelFormatGroups[key].personalization.push(item.personalization);
-                        channelFormatGroups[key].targetingAccuracy.push(item.targetingAccuracy);
-                        channelFormatGroups[key].cjTargeting.push(item.cjTargeting);
+                        grouped[key].push(item);
                     });
                     
-                    const aggregated = Object.values(channelFormatGroups).map(group => {
-                        const item = {
-                            name: group.name,
-                            channel: group.channel,
-                            format: group.format,
-                            integralIndex: group.integralIndex.reduce((a, b) => a + b, 0) / group.integralIndex.length,
-                            brandIndex: group.brandIndex.reduce((a, b) => a + b, 0) / group.brandIndex.length,
-                            purchaseIndex: group.purchaseIndex.reduce((a, b) => a + b, 0) / group.purchaseIndex.length,
-                            trust: group.trust.reduce((a, b) => a + b, 0) / group.trust.length,
-                            passiveConsumption: group.passiveConsumption.reduce((a, b) => a + b, 0) / group.passiveConsumption.length,
-                            formatScore: group.formatScore.reduce((a, b) => a + b, 0) / group.formatScore.length,
-                            attentionShare: group.attentionShare.reduce((a, b) => a + b, 0) / group.attentionShare.length,
-                            contactTime: group.contactTime.reduce((a, b) => a + b, 0) / group.contactTime.length,
-                            momentaryClutter: group.momentaryClutter.reduce((a, b) => a + b, 0) / group.momentaryClutter.length,
-                            personalization: group.personalization.reduce((a, b) => a + b, 0) / group.personalization.length,
-                            targetingAccuracy: group.targetingAccuracy.reduce((a, b) => a + b, 0) / group.targetingAccuracy.length,
-                            cjTargeting: group.cjTargeting.reduce((a, b) => a + b, 0) / group.cjTargeting.length
+                    return Object.entries(grouped).map(([key, items]) => {
+                        const avgItem = {
+                            name: key,
+                            channel: items[0].channel,
+                            format: items[0].format,
+                            formatStrength: items.reduce((sum, item) => sum + item.formatStrength, 0) / items.length,
+                            visualShare: items.reduce((sum, item) => sum + item.visualShare, 0) / items.length,
+                            contactDuration: items.reduce((sum, item) => sum + item.contactDuration, 0) / items.length,
+                            contactShare: items.reduce((sum, item) => sum + item.contactShare, 0) / items.length,
+                            momentClutter: items.reduce((sum, item) => sum + item.momentClutter, 0) / items.length,
+                            trust: items.reduce((sum, item) => sum + item.trust, 0) / items.length,
+                            channelClutter: items.reduce((sum, item) => sum + item.channelClutter, 0) / items.length,
+                            qualityIndex: items.reduce((sum, item) => sum + item.qualityIndex, 0) / items.length,
+                            relevanceIndex: items.reduce((sum, item) => sum + item.relevanceIndex, 0) / items.length,
+                            frequencyIndex: items.reduce((sum, item) => sum + item.frequencyIndex, 0) / items.length,
+                            brandEfficiency: items.reduce((sum, item) => sum + item.brandEfficiency, 0) / items.length,
+                            purchaseEfficiency: items.reduce((sum, item) => sum + item.purchaseEfficiency, 0) / items.length
                         };
-                        item.ratingValue = getRatingValue(item);
-                        return item;
-                    });
+                        avgItem.ratingValue = getRatingValue(avgItem);
+                        return avgItem;
+                    }).sort((a, b) => b.ratingValue - a.ratingValue).slice(0, displayCount);
                     
-                    return aggregated
-                        .sort((a, b) => b.ratingValue - a.ratingValue)
-                        .slice(0, displayCount);
                 } else {
-                    const result = filtered
-                        .map(item => {
-                            const newItem = {
-                                ...item,
-                                name: `${item.channel} - ${item.format} (${item.duration}s)`
-                            };
-                            newItem.ratingValue = getRatingValue(newItem);
-                            return newItem;
-                        })
-                        .sort((a, b) => b.ratingValue - a.ratingValue)
-                        .slice(0, displayCount);
-                    return result;
+                    // Канал + Формат + Длительность
+                    return filtered.map(item => ({
+                        ...item,
+                        name: `${item.channel} - ${item.format}${item.duration ? ` (${item.duration}с)` : ''}`,
+                        ratingValue: getRatingValue(item)
+                    })).sort((a, b) => b.ratingValue - a.ratingValue).slice(0, displayCount);
                 }
-            }, [data, selectedChannels, viewMode, displayCount, ratingType]);
+            }, [data, viewMode, selectedChannels, displayCount, ratingType]);
+
+            const updateBarChart = () => {
+                const ctx = document.getElementById('barChart');
+                if (!ctx) return;
+                
+                if (charts.bar) {
+                    charts.bar.destroy();
+                }
+                
+                const newChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: processedData.map(item => item.name),
+                        datasets: [
+                            {
+                                label: ratingType === 'brand' ? 'Эффективность для бренд-метрик' : 'Эффективность для бизнес-показателей',
+                                data: processedData.map(item => item.ratingValue),
+                                backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                                borderColor: 'rgba(102, 126, 234, 1)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.parsed.y.toFixed(4)}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Значение индекса'
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    autoSkip: false,
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                setCharts(prev => ({...prev, bar: newChart}));
+            };
+
+            const updateRadarChart = () => {
+                const ctx = document.getElementById('radarChart');
+                if (!ctx) return;
+                
+                if (charts.radar) {
+                    charts.radar.destroy();
+                }
+                
+                const top5 = processedData.slice(0, 5);
+                
+                const newChart = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: [
+                            'Сила воздействия',
+                            'Доля в поле зрения',
+                            'Длительность контакта',
+                            'Доля контактов',
+                            'Доверие',
+                            'Индекс качества',
+                            'Индекс релевантности'
+                        ],
+                        datasets: top5.map((item, index) => ({
+                            label: item.name,
+                            data: [
+                                item.formatStrength,
+                                item.visualShare,
+                                item.contactDuration,
+                                item.contactShare,
+                                item.trust,
+                                item.qualityIndex,
+                                item.relevanceIndex
+                            ],
+                            borderColor: `hsla(${index * 72}, 70%, 50%, 1)`,
+                            backgroundColor: `hsla(${index * 72}, 70%, 50%, 0.2)`,
+                            borderWidth: 2
+                        }))
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        },
+                        scales: {
+                            r: {
+                                beginAtZero: true,
+                                max: 1
+                            }
+                        }
+                    }
+                });
+                
+                setCharts(prev => ({...prev, radar: newChart}));
+            };
+
+            const updateLineChart = () => {
+                const ctx = document.getElementById('lineChart');
+                if (!ctx) return;
+                
+                if (charts.line) {
+                    charts.line.destroy();
+                }
+                
+                const newChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: processedData.map(item => item.name),
+                        datasets: [
+                            {
+                                label: 'Индекс качества',
+                                data: processedData.map(item => item.qualityIndex),
+                                borderColor: 'rgba(102, 126, 234, 1)',
+                                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                                borderWidth: 2,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Индекс релевантности',
+                                data: processedData.map(item => item.relevanceIndex),
+                                borderColor: 'rgba(118, 75, 162, 1)',
+                                backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                                borderWidth: 2,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Индекс частоты',
+                                data: processedData.map(item => item.frequencyIndex),
+                                borderColor: 'rgba(244, 114, 182, 1)',
+                                backgroundColor: 'rgba(244, 114, 182, 0.1)',
+                                borderWidth: 2,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Значение индекса'
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    autoSkip: false,
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                setCharts(prev => ({...prev, line: newChart}));
+            };
+
+            const updateScatterChart = () => {
+                const ctx = document.getElementById('scatterChart');
+                if (!ctx) return;
+                
+                if (charts.scatter) {
+                    charts.scatter.destroy();
+                }
+                
+                const newChart = new Chart(ctx, {
+                    type: 'scatter',
+                    data: {
+                        datasets: [{
+                            label: 'Каналы',
+                            data: processedData.map(item => ({
+                                x: item.qualityIndex,
+                                y: item.ratingValue,
+                                label: item.name
+                            })),
+                            backgroundColor: processedData.map((_, index) => 
+                                `hsla(${(index * 360) / processedData.length}, 70%, 50%, 0.6)`
+                            ),
+                            borderColor: processedData.map((_, index) => 
+                                `hsla(${(index * 360) / processedData.length}, 70%, 50%, 1)`
+                            ),
+                            borderWidth: 2,
+                            pointRadius: 8,
+                            pointHoverRadius: 10
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const point = context.raw;
+                                        return [
+                                            point.label,
+                                            `Индекс качества: ${point.x.toFixed(4)}`,
+                                            `${ratingType === 'brand' ? 'Бренд-эффективность' : 'Бизнес-эффективность'}: ${point.y.toFixed(4)}`
+                                        ];
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Индекс качества'
+                                },
+                                beginAtZero: true
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: ratingType === 'brand' ? 'Эффективность для бренд-метрик' : 'Эффективность для бизнес-показателей'
+                                },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+                
+                setCharts(prev => ({...prev, scatter: newChart}));
+            };
+
+            useEffect(() => {
+                if (processedData.length > 0) {
+                    setTimeout(() => {
+                        updateBarChart();
+                        updateRadarChart();
+                        updateLineChart();
+                        updateScatterChart();
+                    }, 100);
+                }
+            }, [processedData]);
 
             const handleChannelToggle = (channel) => {
                 setSelectedChannels(prev => 
@@ -731,144 +772,144 @@
                 );
             };
 
-            const getRatingTypeLabel = () => {
-                switch (ratingType) {
-                    case 'brand': return 'Рейтинг по бренд-метрикам';
-                    case 'purchase': return 'Рейтинг по намерению покупки';
-                    default: return 'Общий интегральный рейтинг';
+            const handleSelectAll = () => {
+                if (selectedChannels.length === availableChannels.length) {
+                    setSelectedChannels([]);
+                } else {
+                    setSelectedChannels([...availableChannels]);
                 }
             };
 
             if (loading) {
                 return (
-                    <div className="loading">
-                        <div style={{fontSize: '24px', marginBottom: '10px'}}>Загрузка данных...</div>
-                        <div style={{fontSize: '16px', color: '#666'}}>Читаем Excel файл calc_mts_v18_processed.xlsx</div>
+                    <div className="container">
+                        <div className="loading">
+                            <div>⏳ Загрузка данных...</div>
+                            <div style={{fontSize: '14px', marginTop: '10px', color: '#9ca3af'}}>
+                                Загружается файл calc_mts_v18_processed_v9_int.xlsx
+                            </div>
+                        </div>
                     </div>
                 );
             }
 
             if (error) {
                 return (
-                    <div className="error">
-                        <h3>Ошибка загрузки данных</h3>
-                        <p><strong>Проблема:</strong> {error}</p>
-                        <div>
-                            <p><strong>Возможные решения:</strong></p>
-                            <ul>
-                                <li>Убедитесь что файл <code>calc_mts_v18_processed.xlsx</code> загружен в GitHub</li>
-                                <li>Файл должен быть в той же папке что и <code>index.html</code></li>
-                                <li>Проверьте точность названия файла</li>
-                                <li>Возможно нужно подождать несколько минут для обновления GitHub Pages</li>
-                            </ul>
+                    <div className="container">
+                        <div className="error">
+                            <strong>Ошибка загрузки данных:</strong><br/>
+                            {error}<br/><br/>
+                            Убедитесь, что файл calc_mts_v18_processed_v9_int.xlsx находится в той же папке, что и HTML файл.
                         </div>
-                        <button className="btn" onClick={() => window.location.reload()}>
-                            Попробовать снова
-                        </button>
                     </div>
                 );
             }
 
+            const topMetrics = processedData.slice(0, 5);
+            const avgQuality = processedData.reduce((sum, item) => sum + item.qualityIndex, 0) / processedData.length || 0;
+            const avgRelevance = processedData.reduce((sum, item) => sum + item.relevanceIndex, 0) / processedData.length || 0;
+            const avgFrequency = processedData.reduce((sum, item) => sum + item.frequencyIndex, 0) / processedData.length || 0;
+            const avgBrand = processedData.reduce((sum, item) => sum + item.brandEfficiency, 0) / processedData.length || 0;
+            const avgPurchase = processedData.reduce((sum, item) => sum + item.purchaseEfficiency, 0) / processedData.length || 0;
+
             return (
                 <div className="container">
-                    <h1 className="title">Рейтинг качества медиа каналов</h1>
-                    
-                    <div className="card">
-                        <div className="card-title">Настройки отображения</div>
-                        
-                        <div>
-                            <label className="label">Тип рейтинга:</label>
-                            <div className="rating-type-selector">
-                                <label className={`rating-option ${ratingType === 'general' ? 'selected' : ''}`}>
-                                    <input
-                                        type="radio"
-                                        name="ratingType"
-                                        value="general"
-                                        checked={ratingType === 'general'}
-                                        onChange={(e) => setRatingType(e.target.value)}
-                                    />
-                                    <div className="rating-option-label">
-                                        <div className="rating-option-title">Общий рейтинг</div>
-                                        <div className="rating-option-desc">Интегральный индекс качества</div>
-                                    </div>
-                                </label>
-                                
-                                <label className={`rating-option ${ratingType === 'brand' ? 'selected' : ''}`}>
-                                    <input
-                                        type="radio"
-                                        name="ratingType"
-                                        value="brand"
-                                        checked={ratingType === 'brand'}
-                                        onChange={(e) => setRatingType(e.target.value)}
-                                    />
-                                    <div className="rating-option-label">
-                                        <div className="rating-option-title">Бренд-метрики</div>
-                                        <div className="rating-option-desc">Индекс для брендинга</div>
-                                    </div>
-                                </label>
-                                
-                                <label className={`rating-option ${ratingType === 'purchase' ? 'selected' : ''}`}>
-                                    <input
-                                        type="radio"
-                                        name="ratingType"
-                                        value="purchase"
-                                        checked={ratingType === 'purchase'}
-                                        onChange={(e) => setRatingType(e.target.value)}
-                                    />
-                                    <div className="rating-option-label">
-                                        <div className="rating-option-title">Намерение покупки</div>
-                                        <div className="rating-option-desc">Индекс для конверсии</div>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
+                    <div className="header">
+                        <h1 className="title">📊 Калькулятор эффективности медиа каналов</h1>
+                        <p className="subtitle">Анализ качества, релевантности и потенциала медиа размещений</p>
+                    </div>
 
+                    <div className="info-box">
+                        <strong>ℹ️ Информация о данных:</strong><br/>
+                        Загружено {data.length} записей из {availableChannels.length} медиа каналов.<br/>
+                        Данные включают 7 входных факторов, 3 промежуточных индекса и 2 интегральных показателя эффективности.
+                    </div>
+
+                    <div className="card">
+                        <div className="card-title">⚙️ Настройки отображения</div>
+                        
                         <div className="controls">
                             <div className="control-group">
-                                <label className="label">Режим отображения:</label>
-                                <select 
-                                    className="select"
-                                    value={viewMode} 
-                                    onChange={(e) => setViewMode(e.target.value)}
-                                >
-                                    <option value="channels">Только каналы</option>
-                                    <option value="channel-format">Канал + Формат</option>
-                                    <option value="channel-format-duration">Канал + Формат + Длительность</option>
-                                </select>
+                                <label className="label">Режим отображения</label>
+                                <div className="mode-selector">
+                                    <div 
+                                        className={`mode-option ${viewMode === 'channels' ? 'selected' : ''}`}
+                                        onClick={() => setViewMode('channels')}
+                                    >
+                                        📺 Только каналы
+                                    </div>
+                                    <div 
+                                        className={`mode-option ${viewMode === 'channel-format' ? 'selected' : ''}`}
+                                        onClick={() => setViewMode('channel-format')}
+                                    >
+                                        🎨 Канал + Формат
+                                    </div>
+                                    <div 
+                                        className={`mode-option ${viewMode === 'full' ? 'selected' : ''}`}
+                                        onClick={() => setViewMode('full')}
+                                    >
+                                        ⏱️ Полная детализация
+                                    </div>
+                                </div>
                             </div>
-                            
+
+                            <div className="control-group">
+                                <label className="label">Тип эффективности</label>
+                                <div className="rating-type-selector">
+                                    <label className={`rating-option ${ratingType === 'brand' ? 'selected' : ''}`}>
+                                        <input
+                                            type="radio"
+                                            value="brand"
+                                            checked={ratingType === 'brand'}
+                                            onChange={(e) => setRatingType(e.target.value)}
+                                        />
+                                        <div>
+                                            <strong>🎯 Бренд-метрики</strong><br/>
+                                            <small>Узнаваемость, лояльность</small>
+                                        </div>
+                                    </label>
+                                    <label className={`rating-option ${ratingType === 'purchase' ? 'selected' : ''}`}>
+                                        <input
+                                            type="radio"
+                                            value="purchase"
+                                            checked={ratingType === 'purchase'}
+                                            onChange={(e) => setRatingType(e.target.value)}
+                                        />
+                                        <div>
+                                            <strong>💰 Бизнес-показатели</strong><br/>
+                                            <small>Продажи, конверсии</small>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
                             <div className="control-group">
                                 <label className="label">Количество элементов: {displayCount}</label>
                                 <input
-                                    className="range-input"
                                     type="range"
+                                    className="range-input"
                                     min="5"
-                                    max="30"
+                                    max="50"
                                     value={displayCount}
-                                    onChange={(e) => setDisplayCount(parseInt(e.target.value))}
+                                    onChange={(e) => setDisplayCount(Number(e.target.value))}
                                 />
-                            </div>
-                            
-                            <div className="control-group">
-                                <div className="info-text">
-                                    Показано: {Math.min(displayCount, processedData.length)} из {processedData.length}<br/>
-                                    Всего записей: {data.length}
-                                </div>
                             </div>
                         </div>
 
-                        <div>
-                            <label className="label">Выберите каналы:</label>
-                            <div className="channels-grid">
+                        <div className="control-group">
+                            <label className="label">Выбор каналов для анализа</label>
+                            <button className="select-all-btn" onClick={handleSelectAll}>
+                                {selectedChannels.length === availableChannels.length ? '✗ Снять все' : '✓ Выбрать все'}
+                            </button>
+                            <div className="channel-selector">
                                 {availableChannels.map(channel => (
-                                    <label key={channel} className="checkbox-label">
+                                    <label key={channel} className="channel-item">
                                         <input
-                                            className="checkbox"
                                             type="checkbox"
                                             checked={selectedChannels.includes(channel)}
                                             onChange={() => handleChannelToggle(channel)}
                                         />
-                                        <span title={channel}>{channel}</span>
+                                        {channel}
                                     </label>
                                 ))}
                             </div>
@@ -876,24 +917,62 @@
                     </div>
 
                     <div className="card">
-                        <h2 className="card-title">{getRatingTypeLabel()}</h2>
-                        <div style={{overflowX: 'auto'}}>
-                            <table className="table">
+                        <div className="card-title">📈 Сводные метрики</div>
+                        <div className="metrics-grid">
+                            <div className="metric-card">
+                                <div className="metric-value">{avgQuality.toFixed(3)}</div>
+                                <div className="metric-label">Средний индекс качества</div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-value">{avgRelevance.toFixed(3)}</div>
+                                <div className="metric-label">Средний индекс релевантности</div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-value">{avgFrequency.toFixed(3)}</div>
+                                <div className="metric-label">Средний индекс частоты</div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-value">{avgBrand.toFixed(3)}</div>
+                                <div className="metric-label">Средняя бренд-эффективность</div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-value">{avgPurchase.toFixed(3)}</div>
+                                <div className="metric-label">Средняя бизнес-эффективность</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="card">
+                        <div className="card-title">📊 Интегральный рейтинг</div>
+                        <div className="table-container">
+                            <table>
                                 <thead>
                                     <tr>
-                                        <th>Рейтинг</th>
+                                        <th>Ранг</th>
                                         <th>Название</th>
-                                        <th style={{textAlign: 'center'}}>Значение индекса</th>
+                                        <th>Индекс качества</th>
+                                        <th>Индекс релевантности</th>
+                                        <th>Индекс частоты</th>
+                                        <th>Бренд-эффективность</th>
+                                        <th>Бизнес-эффективность</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {processedData.map((item, index) => (
                                         <tr key={index}>
-                                            <td className="rank">#{index + 1}</td>
-                                            <td>{item.name}</td>
-                                            <td className="index-score">
-                                                {item.ratingValue.toFixed(2)}
-                                            </td>
+                                            <td>{index + 1}</td>
+                                            <td><strong>{item.name}</strong></td>
+                                            <td>{item.qualityIndex.toFixed(4)}</td>
+                                            <td>{item.relevanceIndex.toFixed(4)}</td>
+                                            <td>{item.frequencyIndex.toFixed(4)}</td>
+                                            <td style={{
+                                                background: ratingType === 'brand' ? 'linear-gradient(90deg, rgba(102,126,234,0.2), transparent)' : '',
+                                                fontWeight: ratingType === 'brand' ? 'bold' : 'normal'
+                                            }}>{item.brandEfficiency.toFixed(4)}</td>
+                                            <td style={{
+                                                background: ratingType === 'purchase' ? 'linear-gradient(90deg, rgba(118,75,162,0.2), transparent)' : '',
+                                                fontWeight: ratingType === 'purchase' ? 'bold' : 'normal'
+                                            }}>{item.purchaseEfficiency.toFixed(4)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -901,63 +980,85 @@
                         </div>
                     </div>
 
-                    <div className="chart-container">
-                        <div className="chart-card">
-                            <h2 className="card-title">{getRatingTypeLabel()}</h2>
-                            <div className="canvas-container">
-                                <BarChart 
-                                    data={processedData} 
-                                    width={600} 
-                                    height={400} 
-                                    ratingType={ratingType}
-                                />
+                    <div className="grid-2">
+                        <div className="card">
+                            <div className="card-title">📊 Рейтинг эффективности</div>
+                            <div className="chart-container">
+                                <canvas id="barChart"></canvas>
                             </div>
                         </div>
-                        
-                        <div className="chart-card">
-                            <h2 className="card-title">Сравнение топ-5 по критериям</h2>
-                            <div className="canvas-container">
-                                <RadarChart data={processedData} width={600} height={400} />
+
+                        <div className="card">
+                            <div className="card-title">🎯 Сравнение топ-5 по факторам</div>
+                            <div className="chart-container">
+                                <canvas id="radarChart"></canvas>
                             </div>
                         </div>
                     </div>
 
-                    <div className="card">
-                        <h2 className="card-title">Статистика</h2>
-                        <div className="stats-grid">
-                            <div className="stat-card blue">
-                                <div className="stat-value blue">
-                                    {selectedChannels.length}
-                                </div>
-                                <div className="stat-label">Выбрано каналов</div>
+                    <div className="grid-2">
+                        <div className="card">
+                            <div className="card-title">📈 Динамика индексов</div>
+                            <div className="chart-container">
+                                <canvas id="lineChart"></canvas>
                             </div>
-                            <div className="stat-card green">
-                                <div className="stat-value green">
-                                    {data.filter(item => selectedChannels.includes(item.channel)).length}
-                                </div>
-                                <div className="stat-label">Всего записей</div>
-                            </div>
-                            <div className="stat-card orange">
-                                <div className="stat-value orange">
-                                    {processedData.length > 0 ? processedData[0].ratingValue.toFixed(2) : '0.00'}
-                                </div>
-                                <div className="stat-label">Лучший рейтинг</div>
-                            </div>
-                            <div className="stat-card purple">
-                                <div className="stat-value purple">
-                                    {processedData.length > 0 ? 
-                                        (processedData.reduce((sum, item) => sum + item.ratingValue, 0) / processedData.length).toFixed(2) 
-                                        : '0.00'}
-                                </div>
-                                <div className="stat-label">Средний рейтинг</div>
+                        </div>
+
+                        <div className="card">
+                            <div className="card-title">🔍 Матрица качество-эффективность</div>
+                            <div className="chart-container">
+                                <canvas id="scatterChart"></canvas>
                             </div>
                         </div>
                     </div>
+
+                    {topMetrics.length > 0 && (
+                        <div className="card">
+                            <div className="card-title">🏆 Топ-5 каналов: детальный анализ факторов</div>
+                            {topMetrics.map((item, index) => (
+                                <div key={index} style={{marginBottom: '20px', padding: '15px', background: '#f9fafb', borderRadius: '8px'}}>
+                                    <h4 style={{marginBottom: '10px', color: '#667eea'}}>
+                                        #{index + 1} {item.name}
+                                    </h4>
+                                    <div className="factor-grid">
+                                        <div className="factor-item">
+                                            <div className="factor-label">Сила воздействия</div>
+                                            <div className="factor-value">{item.formatStrength.toFixed(3)}</div>
+                                        </div>
+                                        <div className="factor-item">
+                                            <div className="factor-label">Доля в поле зрения</div>
+                                            <div className="factor-value">{item.visualShare.toFixed(3)}</div>
+                                        </div>
+                                        <div className="factor-item">
+                                            <div className="factor-label">Длительность контакта</div>
+                                            <div className="factor-value">{item.contactDuration.toFixed(3)}</div>
+                                        </div>
+                                        <div className="factor-item">
+                                            <div className="factor-label">Доля контактов</div>
+                                            <div className="factor-value">{item.contactShare.toFixed(3)}</div>
+                                        </div>
+                                        <div className="factor-item">
+                                            <div className="factor-label">Доверие</div>
+                                            <div className="factor-value">{item.trust.toFixed(3)}</div>
+                                        </div>
+                                        <div className="factor-item">
+                                            <div className="factor-label">Клаттер момента</div>
+                                            <div className="factor-value">{item.momentClutter.toFixed(3)}</div>
+                                        </div>
+                                        <div className="factor-item">
+                                            <div className="factor-label">Клаттер канала</div>
+                                            <div className="factor-value">{item.channelClutter.toFixed(3)}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             );
         };
 
-        ReactDOM.render(React.createElement(MediaRatingDashboard), document.getElementById('root'));
+        ReactDOM.render(<MediaCalculator />, document.getElementById('root'));
     </script>
 </body>
 </html>
