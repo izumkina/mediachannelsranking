@@ -210,6 +210,18 @@
             position: sticky;
             top: 0;
             z-index: 10;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+        th:hover {
+            background: linear-gradient(135deg, #e5e7eb, #d1d5db);
+        }
+        .sort-indicator {
+            display: inline-block;
+            margin-left: 5px;
+            font-size: 12px;
+            color: #667eea;
         }
         td {
             padding: 12px;
@@ -327,6 +339,7 @@
             const [displayCount, setDisplayCount] = useState(20);
             const [ratingType, setRatingType] = useState('brand');
             const [charts, setCharts] = useState({});
+            const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
 
             useEffect(() => {
                 loadData();
@@ -420,6 +433,8 @@
                     return ratingType === 'brand' ? item.brandEfficiency : item.purchaseEfficiency;
                 };
                 
+                let result = [];
+                
                 if (viewMode === 'channels') {
                     // Группировка по каналам
                     const grouped = {};
@@ -430,7 +445,7 @@
                         grouped[item.channel].push(item);
                     });
                     
-                    return Object.entries(grouped).map(([channel, items]) => {
+                    result = Object.entries(grouped).map(([channel, items]) => {
                         const avgItem = {
                             name: channel,
                             channel: channel,
@@ -450,7 +465,7 @@
                         };
                         avgItem.ratingValue = getRatingValue(avgItem);
                         return avgItem;
-                    }).sort((a, b) => b.ratingValue - a.ratingValue).slice(0, displayCount);
+                    });
                     
                 } else if (viewMode === 'channel-format') {
                     // Группировка по каналу и формату
@@ -463,7 +478,7 @@
                         grouped[key].push(item);
                     });
                     
-                    return Object.entries(grouped).map(([key, items]) => {
+                    result = Object.entries(grouped).map(([key, items]) => {
                         const avgItem = {
                             name: key,
                             channel: items[0].channel,
@@ -483,17 +498,44 @@
                         };
                         avgItem.ratingValue = getRatingValue(avgItem);
                         return avgItem;
-                    }).sort((a, b) => b.ratingValue - a.ratingValue).slice(0, displayCount);
+                    });
                     
                 } else {
                     // Канал + Формат + Длительность
-                    return filtered.map(item => ({
+                    result = filtered.map(item => ({
                         ...item,
                         name: `${item.channel} - ${item.format}${item.duration ? ` (${item.duration}с)` : ''}`,
                         ratingValue: getRatingValue(item)
-                    })).sort((a, b) => b.ratingValue - a.ratingValue).slice(0, displayCount);
+                    }));
                 }
-            }, [data, viewMode, selectedChannels, displayCount, ratingType]);
+                
+                // Применяем сортировку
+                if (sortConfig.key) {
+                    result.sort((a, b) => {
+                        let aValue = a[sortConfig.key];
+                        let bValue = b[sortConfig.key];
+                        
+                        // Для строк сравниваем как строки
+                        if (typeof aValue === 'string') {
+                            aValue = aValue.toLowerCase();
+                            bValue = bValue.toLowerCase();
+                        }
+                        
+                        if (aValue < bValue) {
+                            return sortConfig.direction === 'asc' ? -1 : 1;
+                        }
+                        if (aValue > bValue) {
+                            return sortConfig.direction === 'asc' ? 1 : -1;
+                        }
+                        return 0;
+                    });
+                } else {
+                    // По умолчанию сортируем по ratingValue
+                    result.sort((a, b) => b.ratingValue - a.ratingValue);
+                }
+                
+                return result.slice(0, displayCount);
+            }, [data, viewMode, selectedChannels, displayCount, ratingType, sortConfig]);
 
             const updateBarChart = () => {
                 const ctx = document.getElementById('barChart');
@@ -780,6 +822,21 @@
                 }
             };
 
+            const handleSort = (key) => {
+                let direction = 'desc';
+                if (sortConfig.key === key && sortConfig.direction === 'desc') {
+                    direction = 'asc';
+                }
+                setSortConfig({ key, direction });
+            };
+
+            const getSortIndicator = (columnKey) => {
+                if (sortConfig.key !== columnKey) {
+                    return '↕️';
+                }
+                return sortConfig.direction === 'desc' ? '↓' : '↑';
+            };
+
             if (loading) {
                 return (
                     <div className="container">
@@ -948,13 +1005,34 @@
                             <table>
                                 <thead>
                                     <tr>
-                                        <th>Ранг</th>
-                                        <th>Название</th>
-                                        <th>Индекс качества</th>
-                                        <th>Индекс релевантности</th>
-                                        <th>Индекс частоты</th>
-                                        <th>Бренд-эффективность</th>
-                                        <th>Бизнес-эффективность</th>
+                                        <th onClick={() => handleSort('rank')}>
+                                            Ранг
+                                            <span className="sort-indicator">{getSortIndicator('rank')}</span>
+                                        </th>
+                                        <th onClick={() => handleSort('name')}>
+                                            Название
+                                            <span className="sort-indicator">{getSortIndicator('name')}</span>
+                                        </th>
+                                        <th onClick={() => handleSort('qualityIndex')}>
+                                            Индекс качества
+                                            <span className="sort-indicator">{getSortIndicator('qualityIndex')}</span>
+                                        </th>
+                                        <th onClick={() => handleSort('relevanceIndex')}>
+                                            Индекс релевантности
+                                            <span className="sort-indicator">{getSortIndicator('relevanceIndex')}</span>
+                                        </th>
+                                        <th onClick={() => handleSort('frequencyIndex')}>
+                                            Индекс частоты
+                                            <span className="sort-indicator">{getSortIndicator('frequencyIndex')}</span>
+                                        </th>
+                                        <th onClick={() => handleSort('brandEfficiency')}>
+                                            Бренд-эффективность
+                                            <span className="sort-indicator">{getSortIndicator('brandEfficiency')}</span>
+                                        </th>
+                                        <th onClick={() => handleSort('purchaseEfficiency')}>
+                                            Бизнес-эффективность
+                                            <span className="sort-indicator">{getSortIndicator('purchaseEfficiency')}</span>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
