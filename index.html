@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калькулятор качества контакта · МТС</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#F4F3F0; --surface:#FFFFFF; --surface-2:#FBFAF8;
+  --ink:#15151B; --ink-2:#5C5C68; --ink-3:#9A9AA4;
+  --line:#E7E5E0; --line-2:#F0EEEA;
+  --mts:#E30611; --brand:#E30611; --conv:#2440D9; --integral:#15151B;
+  --brand-soft:#FCE7E7; --conv-soft:#E4E8FB; --integral-soft:#EAEAEE;
+  --shadow:0 1px 2px rgba(20,20,26,.04),0 8px 24px rgba(20,20,26,.05);
+  --radius:14px;
+  --mono:"Inter",-apple-system,system-ui,sans-serif;
+  --disp:"Space Grotesk","Inter",-apple-system,system-ui,sans-serif;
+  --body:"Inter",-apple-system,"Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--body);
+  -webkit-font-smoothing:antialiased; line-height:1.45;
+  font-variant-numeric:tabular-nums;
+}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+
+/* ---------- header ---------- */
+header.top{padding:34px 0 22px;border-bottom:1px solid var(--line)}
+.brandline{display:flex;align-items:center;gap:14px}
+.mark{width:38px;height:38px;border-radius:9px;background:var(--mts);position:relative;flex:0 0 auto;
+  box-shadow:0 4px 12px rgba(227,6,17,.28)}
+.mark::after{content:"";position:absolute;inset:11px;border:3px solid #fff;border-radius:3px}
+.brandline .kicker{font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+h1{font:700 30px/1.05 var(--disp);letter-spacing:-.02em;margin:14px 0 6px}
+.sub{color:var(--ink-2);font-size:14.5px;max-width:640px}
+
+/* ---------- controls ---------- */
+.controls{position:sticky;top:0;z-index:20;background:rgba(244,243,240,.86);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:14px 0}
+.ctrl-row{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-end}
+.ctrl{display:flex;flex-direction:column;gap:7px}
+.ctrl > label{font:600 10.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3)}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:4px;gap:3px;box-shadow:var(--shadow)}
+.seg button{appearance:none;border:0;background:transparent;cursor:pointer;font:600 13px/1 var(--body);
+  color:var(--ink-2);padding:8px 14px;border-radius:8px;transition:.16s;white-space:nowrap}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--ink);color:#fff}
+.seg.goal button.on[data-v="BP"]{background:var(--brand)}
+.seg.goal button.on[data-v="BQ"]{background:var(--conv)}
+.seg.goal button.on[data-v="integral"]{background:var(--integral)}
+
+/* ---------- layout ---------- */
+main{padding:30px 0 80px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);margin-bottom:26px;overflow:hidden}
+.panel-head{padding:20px 24px 0}
+.eyebrow{font:600 10.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mts)}
+.panel h2{font:600 19px/1.15 var(--disp);letter-spacing:-.01em;margin:9px 0 4px}
+.panel .desc{color:var(--ink-2);font-size:13.5px;margin:0 0 4px;max-width:760px}
+.panel-body{padding:18px 24px 24px}
+
+/* ---------- ranking ---------- */
+.rank-meta{display:flex;justify-content:space-between;align-items:baseline;padding:0 24px 12px;color:var(--ink-3);font-size:12.5px}
+.rows{padding:2px 14px 6px}
+.row{display:grid;grid-template-columns:34px 1fr 132px;gap:14px;align-items:center;
+  padding:9px 10px;border-radius:10px;cursor:pointer;transition:background .14s}
+.row:hover{background:var(--surface-2)}
+.row.sel{background:var(--integral-soft)}
+.row .rk{font:600 13px/1 var(--mono);color:var(--ink-3);text-align:right}
+.row .nm{min-width:0}
+.row .nm .t{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .nm .s{font-size:11.5px;color:var(--ink-3);margin-top:1px}
+.bararea{position:relative}
+.bartrack{height:24px;background:var(--line-2);border-radius:7px;overflow:hidden}
+.barfill{height:100%;border-radius:7px;transition:width .5s cubic-bezier(.2,.7,.2,1)}
+.barval{position:absolute;top:0;right:8px;height:24px;display:flex;align-items:center;
+  font:600 12px/1 var(--mono);color:var(--ink)}
+.barval.inside{color:#fff;right:8px}
+.chips{display:flex;gap:5px;justify-content:flex-end}
+.chip{font:600 11px/1 var(--mono);padding:5px 7px;border-radius:6px;min-width:46px;text-align:center}
+.chip.b{background:var(--brand-soft);color:var(--brand)}
+.chip.c{background:var(--conv-soft);color:var(--conv)}
+.chip.q{background:var(--integral-soft);color:var(--ink-2)}
+
+/* selection tray */
+.tray{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:2px 24px 6px;min-height:30px}
+.tray .lbl{font:600 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-right:2px}
+.tray .pick{display:inline-flex;align-items:center;gap:6px;background:var(--ink);color:#fff;
+  font:600 12px/1 var(--body);padding:6px 8px 6px 10px;border-radius:8px;max-width:240px}
+.tray .pick .x{cursor:pointer;width:15px;height:15px;border-radius:4px;display:inline-flex;
+  align-items:center;justify-content:center;background:rgba(255,255,255,.18);font-size:13px;line-height:1;flex:0 0 auto}
+.tray .pick .x:hover{background:rgba(255,255,255,.34)}
+.tray .pick .nm-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tray .empty{color:var(--ink-3);font-size:12.5px}
+.tray .act{margin-left:auto;display:flex;gap:7px}
+.tray .act button{appearance:none;border:1px solid var(--line);background:var(--surface);cursor:pointer;
+  font:600 12px/1 var(--body);color:var(--ink-2);padding:7px 11px;border-radius:8px;transition:.14s}
+.tray .act button:hover{color:var(--ink);border-color:var(--ink-3)}
+
+/* selected row */
+.row .nm .t{display:flex;align-items:center;gap:7px}
+.row .box{width:15px;height:15px;border:1.6px solid var(--line);border-radius:4px;flex:0 0 auto;
+  display:inline-flex;align-items:center;justify-content:center;transition:.14s}
+.row.sel .box{background:var(--mts);border-color:var(--mts)}
+.row.sel .box::after{content:"✓";color:#fff;font-size:10px;font-weight:700;line-height:1}
+
+/* ---------- charts ---------- */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.chart{width:100%;height:430px}
+.chart.sm{height:400px}
+.legendnote{font-size:12px;color:var(--ink-3);padding:0 24px 16px;display:flex;gap:18px;flex-wrap:wrap}
+.legendnote b{color:var(--ink-2);font-weight:600}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+
+/* glossary */
+details.gloss{margin-top:6px}
+details.gloss summary{cursor:pointer;font:600 13px/1 var(--body);color:var(--mts);list-style:none;padding:6px 0}
+details.gloss summary::-webkit-details-marker{display:none}
+details.gloss summary::before{content:"＋ ";color:var(--ink-3)}
+details.gloss[open] summary::before{content:"－ "}
+.gtable{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;font-size:13px;padding:8px 2px 4px;color:var(--ink-2)}
+.gtable code{font:600 12px/1 var(--mono);color:var(--ink);background:var(--surface-2);padding:3px 7px;border-radius:5px;border:1px solid var(--line)}
+
+footer{color:var(--ink-3);font-size:12px;text-align:center;padding:0 0 50px}
+
+@media (max-width:880px){
+  .grid2{grid-template-columns:1fr}
+  .row{grid-template-columns:28px 1fr 96px}
+  .chips .chip:nth-child(3){display:none}
+  h1{font-size:25px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+:focus-visible{outline:2px solid var(--mts);outline-offset:2px;border-radius:6px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brandline">
+      <div class="mark" aria-hidden="true"></div>
+      <span class="kicker">МТС · Медиа-аналитика</span>
+    </div>
+    <h1>Калькулятор качества контакта</h1>
+    <p class="sub">Рейтинг медиаканалов и форматов по качеству рекламного контакта. Выберите цель, глубину разреза и сравните каналы между собой.</p>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="wrap ctrl-row">
+    <div class="ctrl">
+      <label>Уровень вложенности</label>
+      <div class="seg" id="lvl">
+        <button data-v="macro" class="on">Макро-каналы</button>
+        <button data-v="channel_format">Каналы и форматы</button>
+        <button data-v="detail">+ длительность</button>
+      </div>
+    </div>
+    <div class="ctrl">
+      <label>Рейтинг по цели</label>
+      <div class="seg goal" id="goal">
+        <button data-v="integral" class="on">Интегральный</button>
+        <button data-v="BP">Брендинг</button>
+        <button data-v="BQ">Конверсии</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+
+  <section class="panel">
+    <div class="panel-head">
+      <span class="eyebrow">Тотал-рейтинг</span>
+      <h2 id="rankTitle">Рейтинг по интегральной оценке</h2>
+      <p class="desc">Сортировка по выбранной цели. Цифры справа — оценки для брендинга <span class="dot" style="background:var(--brand)"></span>, конверсий <span class="dot" style="background:var(--conv)"></span> и индекс качества <span class="dot" style="background:var(--ink-3)"></span>. <b>Нажмите на строки, чтобы выбрать элементы для сравнения на графиках ниже</b> — можно брать любые, из разных мест рейтинга.</p>
+    </div>
+    <div class="tray" id="tray"></div>
+    <div class="rank-meta"><span id="rankCount"></span><span>значения нормализованы, максимум = 1.00</span></div>
+    <div class="rows" id="rows"></div>
+    <div class="panel-body" style="padding-top:0">
+      <details class="gloss">
+        <summary>Расшифровка показателей</summary>
+        <div class="gtable" id="gloss"></div>
+      </details>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <span class="eyebrow">Позиционирование · сигнатурный график</span>
+      <h2>Квадрант «Брендинг × Конверсии»</h2>
+      <p class="desc">Каждый пузырь — выбранный канал или формат. По осям — эффективность для двух целей, размер пузыря — интегральный рейтинг, цвет — медиасреда. Правый верхний угол = универсально сильные размещения.</p>
+    </div>
+    <div class="panel-body"><div id="bubble" class="chart"></div></div>
+    <div class="legendnote" id="bubbleLegend"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Профили · звёздочки</span>
+        <h2>Сравнение драйверов качества</h2>
+        <p class="desc">Лучи — 7 факторов, формирующих качество контакта. Показаны выбранные в рейтинге элементы.</p>
+      </div>
+      <div class="panel-body"><div id="radar" class="chart sm"></div></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Индексы</span>
+        <h2>Качество · Релевантность · Частота</h2>
+        <p class="desc">Три индекса, из которых складываются цели. Брендинг тянет качество, конверсии — релевантность таргетинга.</p>
+      </div>
+      <div class="panel-body"><div id="indices" class="chart sm"></div></div>
+    </section>
+  </div>
+
+</main>
+
+<footer class="wrap">Калькулятор качества контакта · построено на нормализованных данных модели (S–BQ). Интегральный рейтинг = (Брендинг + Конверсии) / 2.</footer>
+
+<script>
+/* ===== data injected below ===== */
+const DATA = {"levels": {"macro": [{"channel": "TG", "n": 3, "S": 0.5333, "X": 0.4513, "AG": 0.049, "AI": 0.18, "AR": 1.0, "BA": 0.6769, "BD": 0.5637, "BI": 0.2135, "BJ": 0.8541, "BK": 0.0667, "BP": 0.3636, "BQ": 0.7157, "integral": 0.5396}, {"channel": "Баннеры", "n": 5, "S": 0.5, "X": 0.5232, "AG": 0.0227, "AI": 0.432, "AR": 0.8591, "BA": 0.6462, "BD": 0.2454, "BI": 0.1249, "BJ": 0.815, "BK": 0.2467, "BP": 0.3802, "BQ": 0.7597, "integral": 0.57}, {"channel": "Диджитал аудио", "n": 6, "S": 0.7, "X": 0.7583, "AG": 0.3243, "AI": 0.85, "AR": 1.0, "BA": 0.6462, "BD": 0.828, "BI": 0.4801, "BJ": 0.8097, "BK": 0.1005, "BP": 0.6111, "BQ": 0.7876, "integral": 0.6994}, {"channel": "Индор", "n": 4, "S": 0.5, "X": 0.7048, "AG": 0.049, "AI": 0.3, "AR": 0.7458, "BA": 0.8615, "BD": 0.765, "BI": 0.2185, "BJ": 0.2041, "BK": 0.4589, "BP": 0.4842, "BQ": 0.4707, "integral": 0.4774}, {"channel": "Инфлюенсеры", "n": 15, "S": 1.0, "X": 0.7261, "AG": 0.3126, "AI": 0.4847, "AR": 0.9524, "BA": 0.9077, "BD": 0.9092, "BI": 0.6728, "BJ": 0.3782, "BK": 0.0617, "BP": 0.6903, "BQ": 0.5186, "integral": 0.6045}, {"channel": "Маркетплейсы", "n": 7, "S": 0.6429, "X": 0.6267, "AG": 0.043, "AI": 0.25, "AR": 0.7929, "BA": 0.6462, "BD": 0.0, "BI": 0.1943, "BJ": 0.895, "BK": 0.1017, "BP": 0.3729, "BQ": 0.7584, "integral": 0.5656}, {"channel": "Наружная реклама (водители)", "n": 4, "S": 0.5, "X": 0.4217, "AG": 0.0336, "AI": 0.0625, "AR": 0.7669, "BA": 0.8615, "BD": 0.2185, "BI": 0.1387, "BJ": 0.1061, "BK": 0.675, "BP": 0.5194, "BQ": 0.4954, "integral": 0.5074}, {"channel": "Наружная реклама (пешеходы)", "n": 4, "S": 0.5, "X": 0.5184, "AG": 0.0461, "AI": 0.175, "AR": 0.7597, "BA": 0.8615, "BD": 0.4132, "BI": 0.1627, "BJ": 0.1061, "BK": 0.675, "BP": 0.5406, "BQ": 0.503, "integral": 0.5218}, {"channel": "Онлайн-видео", "n": 33, "S": 0.9545, "X": 0.7338, "AG": 0.3652, "AI": 0.6712, "AR": 0.836, "BA": 0.8182, "BD": 0.6402, "BI": 0.5238, "BJ": 0.7779, "BK": 0.1488, "BP": 0.6719, "BQ": 0.8055, "integral": 0.7387}, {"channel": "Посевы", "n": 2, "S": 0.6, "X": 0.4853, "AG": 0.0725, "AI": 0.68, "AR": 0.8571, "BA": 0.8462, "BD": 0.7005, "BI": 0.2845, "BJ": 0.3782, "BK": 0.0506, "BP": 0.3408, "BQ": 0.389, "integral": 0.3649}, {"channel": "Радио", "n": 7, "S": 0.7, "X": 0.71, "AG": 0.3529, "AI": 0.7929, "AR": 0.8831, "BA": 0.8484, "BD": 0.7836, "BI": 0.5003, "BJ": 0.3036, "BK": 0.3039, "BP": 0.6621, "BQ": 0.5452, "integral": 0.6037}, {"channel": "Социальные сети", "n": 12, "S": 0.875, "X": 0.6702, "AG": 0.0823, "AI": 0.5792, "AR": 0.947, "BA": 0.7077, "BD": 0.6335, "BI": 0.2953, "BJ": 0.9328, "BK": 0.1125, "BP": 0.4744, "BQ": 0.8235, "integral": 0.649}, {"channel": "ТВ", "n": 20, "S": 1.0, "X": 0.6538, "AG": 0.362, "AI": 0.55, "AR": 0.8947, "BA": 0.9877, "BD": 0.7339, "BI": 0.54, "BJ": 0.3086, "BK": 0.4551, "BP": 0.7831, "BQ": 0.6455, "integral": 0.7143}, {"channel": "Тематические ресурсы", "n": 2, "S": 0.5, "X": 0.6751, "AG": 0.0351, "AI": 0.615, "AR": 0.8636, "BA": 0.6769, "BD": 0.2185, "BI": 0.1625, "BJ": 0.4555, "BK": 0.2177, "BP": 0.3394, "BQ": 0.4985, "integral": 0.419}, {"channel": "Геосервисы", "n": 2, "S": 0.5, "X": 0.3176, "AG": 0.0236, "AI": 0.195, "AR": 1.0, "BA": 0.6615, "BD": 0.9012, "BI": 0.1561, "BJ": 0.5268, "BK": 0.1776, "BP": 0.3226, "BQ": 0.5251, "integral": 0.4239}], "channel_format": [{"channel": "TG", "format": "Текст", "sreda": "Текст", "n": 1, "S": 0.4, "X": 0.3834, "AG": 0.0314, "AI": 0.18, "AR": 1.0, "BA": 0.6769, "BD": 0.5637, "BI": 0.1529, "BJ": 0.8541, "BK": 0.0667, "BP": 0.31, "BQ": 0.6965, "integral": 0.5032}, {"channel": "TG", "format": "Текст+баннер", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.4853, "AG": 0.0255, "AI": 0.18, "AR": 1.0, "BA": 0.6769, "BD": 0.5637, "BI": 0.1558, "BJ": 0.8541, "BK": 0.0667, "BP": 0.3125, "BQ": 0.6974, "integral": 0.505}, {"channel": "TG", "format": "Текст+видео", "sreda": "Видео", "n": 1, "S": 0.7, "X": 0.4853, "AG": 0.0902, "AI": 0.18, "AR": 1.0, "BA": 0.6769, "BD": 0.5637, "BI": 0.3318, "BJ": 0.8541, "BK": 0.0667, "BP": 0.4681, "BQ": 0.7533, "integral": 0.6107}, {"channel": "Баннеры", "format": "Баннер в Smart TV", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.2773, "AG": 0.0235, "AI": 0.12, "AR": 0.9091, "BA": 0.6462, "BD": 0.7422, "BI": 0.1339, "BJ": 0.4555, "BK": 0.1833, "BP": 0.2947, "BQ": 0.4702, "integral": 0.3825}, {"channel": "Баннеры", "format": "Мини-баннеры", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.251, "AG": 0.0094, "AI": 0.12, "AR": 0.7273, "BA": 0.6462, "BD": 0.1212, "BI": 0.0674, "BJ": 1.0, "BK": 0.3878, "BP": 0.4386, "BQ": 0.9523, "integral": 0.6954}, {"channel": "Баннеры", "format": "Премиум, Fullscreen, брендирование страницы", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.8923, "AG": 0.0365, "AI": 1.0, "AR": 1.0, "BA": 0.6462, "BD": 0.1212, "BI": 0.1758, "BJ": 0.8097, "BK": 0.2024, "BP": 0.3995, "BQ": 0.7475, "integral": 0.5735}, {"channel": "Баннеры", "format": "Премиум, Другие премиальные форматы", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.7508, "AG": 0.0337, "AI": 0.69, "AR": 0.9091, "BA": 0.6462, "BD": 0.1212, "BI": 0.1639, "BJ": 0.8097, "BK": 0.2024, "BP": 0.3889, "BQ": 0.7438, "integral": 0.5663}, {"channel": "Баннеры", "format": "Стандарт", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.4444, "AG": 0.0106, "AI": 0.23, "AR": 0.75, "BA": 0.6462, "BD": 0.1212, "BI": 0.0834, "BJ": 1.0, "BK": 0.2573, "BP": 0.3793, "BQ": 0.8848, "integral": 0.632}, {"channel": "Диджитал аудио", "format": "Аудио", "sreda": "Аудио", "n": 6, "S": 0.7, "X": 0.7583, "AG": 0.3243, "AI": 0.85, "AR": 1.0, "BA": 0.6462, "BD": 0.828, "BI": 0.4801, "BJ": 0.8097, "BK": 0.1005, "BP": 0.6111, "BQ": 0.7876, "integral": 0.6994}, {"channel": "Индор", "format": "ВУЗы", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.8249, "AG": 0.0392, "AI": 0.3, "AR": 0.7692, "BA": 0.8615, "BD": 0.8696, "BI": 0.2248, "BJ": 0.2041, "BK": 0.25, "BP": 0.3722, "BQ": 0.3565, "integral": 0.3643}, {"channel": "Индор", "format": "Метро", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.8249, "AG": 0.0588, "AI": 0.3, "AR": 0.7273, "BA": 0.8615, "BD": 0.7422, "BI": 0.2341, "BJ": 0.2041, "BK": 1.0, "BP": 0.8024, "BQ": 0.7766, "integral": 0.7895}, {"channel": "Индор", "format": "Супермаркеты", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.6405, "AG": 0.049, "AI": 0.3, "AR": 0.7368, "BA": 0.8615, "BD": 0.8119, "BI": 0.2171, "BJ": 0.2041, "BK": 0.2554, "BP": 0.3685, "BQ": 0.357, "integral": 0.3627}, {"channel": "Индор", "format": "ТЦ", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.529, "AG": 0.049, "AI": 0.3, "AR": 0.75, "BA": 0.8615, "BD": 0.6363, "BI": 0.1979, "BJ": 0.2041, "BK": 0.3303, "BP": 0.3936, "BQ": 0.3926, "integral": 0.3931}, {"channel": "Инфлюенсеры", "format": "Альт-ролл", "sreda": "Блогеры", "n": 5, "S": 1.0, "X": 0.7596, "AG": 0.2059, "AI": 0.45, "AR": 0.8571, "BA": 0.9077, "BD": 1.0, "BI": 0.6052, "BJ": 0.3782, "BK": 0.0617, "BP": 0.6306, "BQ": 0.4972, "integral": 0.5639}, {"channel": "Инфлюенсеры", "format": "Вертикальные видео", "sreda": "Блогеры", "n": 6, "S": 1.0, "X": 0.6759, "AG": 0.2345, "AI": 0.57, "AR": 1.0, "BA": 0.9077, "BD": 0.773, "BI": 0.5774, "BJ": 0.3782, "BK": 0.0617, "BP": 0.606, "BQ": 0.4883, "integral": 0.5472}, {"channel": "Инфлюенсеры", "format": "Интеграции", "sreda": "Блогеры", "n": 4, "S": 1.0, "X": 0.7596, "AG": 0.5632, "AI": 0.4, "AR": 1.0, "BA": 0.9077, "BD": 1.0, "BI": 0.9003, "BJ": 0.3782, "BK": 0.0617, "BP": 0.8915, "BQ": 0.591, "integral": 0.7412}, {"channel": "Маркетплейсы", "format": "Видеобаннер", "sreda": "Видео", "n": 5, "S": 0.7, "X": 0.6438, "AG": 0.0514, "AI": 0.25, "AR": 0.8, "BA": 0.6462, "BD": 0.0, "BI": 0.2254, "BJ": 0.895, "BK": 0.089, "BP": 0.3933, "BQ": 0.7612, "integral": 0.5772}, {"channel": "Маркетплейсы", "format": "Статика премиум", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.7239, "AG": 0.0337, "AI": 0.25, "AR": 0.8, "BA": 0.6462, "BD": 0.0, "BI": 0.1522, "BJ": 0.895, "BK": 0.1335, "BP": 0.3535, "BQ": 0.7627, "integral": 0.5581}, {"channel": "Маркетплейсы", "format": "Статика стандарт", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.4444, "AG": 0.0106, "AI": 0.25, "AR": 0.75, "BA": 0.6462, "BD": 0.0, "BI": 0.0805, "BJ": 0.895, "BK": 0.1335, "BP": 0.2901, "BQ": 0.7399, "integral": 0.515}, {"channel": "Наружная реклама (водители)", "format": "Билборд (статика)", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.2812, "AG": 0.0216, "AI": 0.05, "AR": 0.7368, "BA": 0.8615, "BD": 0.2185, "BI": 0.114, "BJ": 0.1061, "BK": 0.949, "BP": 0.6517, "BQ": 0.6399, "integral": 0.6458}, {"channel": "Наружная реклама (водители)", "format": "Биллборд (цифра)", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.2812, "AG": 0.0275, "AI": 0.05, "AR": 0.7368, "BA": 0.8615, "BD": 0.2185, "BI": 0.1224, "BJ": 0.1061, "BK": 0.949, "BP": 0.6592, "BQ": 0.6426, "integral": 0.6509}, {"channel": "Наружная реклама (водители)", "format": "Медиафасад", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.8432, "AG": 0.0667, "AI": 0.1, "AR": 0.8571, "BA": 0.8615, "BD": 0.2185, "BI": 0.2089, "BJ": 0.1061, "BK": 0.4857, "BP": 0.475, "BQ": 0.4124, "integral": 0.4437}, {"channel": "Наружная реклама (водители)", "format": "Ситиформат (цифра)", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.2812, "AG": 0.0186, "AI": 0.05, "AR": 0.7368, "BA": 0.8615, "BD": 0.2185, "BI": 0.1096, "BJ": 0.1061, "BK": 0.3163, "BP": 0.2919, "BQ": 0.2867, "integral": 0.2893}, {"channel": "Наружная реклама (пешеходы)", "format": "Билборд (статика)", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.3579, "AG": 0.0294, "AI": 0.15, "AR": 0.7273, "BA": 0.8615, "BD": 0.4132, "BI": 0.136, "BJ": 0.1061, "BK": 0.949, "BP": 0.6712, "BQ": 0.6469, "integral": 0.6591}, {"channel": "Наружная реклама (пешеходы)", "format": "Биллборд (цифра)", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.3579, "AG": 0.0294, "AI": 0.15, "AR": 0.7273, "BA": 0.8615, "BD": 0.4132, "BI": 0.1391, "BJ": 0.1061, "BK": 0.949, "BP": 0.6739, "BQ": 0.6479, "integral": 0.6609}, {"channel": "Наружная реклама (пешеходы)", "format": "Медиафасад", "sreda": "Статика", "n": 1, "S": 0.5, "X": 1.0, "AG": 0.0863, "AI": 0.25, "AR": 0.8571, "BA": 0.8615, "BD": 0.4132, "BI": 0.2315, "BJ": 0.1061, "BK": 0.4857, "BP": 0.495, "BQ": 0.4196, "integral": 0.4573}, {"channel": "Наружная реклама (пешеходы)", "format": "Ситиформат (цифра)", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.3579, "AG": 0.0392, "AI": 0.15, "AR": 0.7273, "BA": 0.8615, "BD": 0.4132, "BI": 0.144, "BJ": 0.1061, "BK": 0.3163, "BP": 0.3223, "BQ": 0.2976, "integral": 0.31}, {"channel": "Онлайн-видео", "format": "Аут-стрим онлайн-видео (Skip)", "sreda": "Видео", "n": 5, "S": 0.7, "X": 0.713, "AG": 0.0312, "AI": 0.44, "AR": 0.7368, "BA": 0.7385, "BD": 0.4132, "BI": 0.2025, "BJ": 1.0, "BK": 0.1716, "BP": 0.4363, "BQ": 0.8749, "integral": 0.6556}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео Skip", "sreda": "Видео", "n": 5, "S": 1.0, "X": 0.713, "AG": 0.1667, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.4886, "BJ": 1.0, "BK": 0.1512, "BP": 0.6779, "BQ": 0.9546, "integral": 0.8162}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео UnSkip", "sreda": "Видео", "n": 5, "S": 1.0, "X": 0.6793, "AG": 0.34, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.5455, "BJ": 1.0, "BK": 0.1469, "BP": 0.7258, "BQ": 0.9703, "integral": 0.848}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (smart, streaming)", "sreda": "Видео", "n": 9, "S": 1.0, "X": 0.6538, "AG": 0.5515, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.5514, "BJ": 0.5927, "BK": 0.1658, "BP": 0.676, "BQ": 0.6913, "integral": 0.6837}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (web, app)", "sreda": "Видео", "n": 9, "S": 1.0, "X": 0.8673, "AG": 0.4888, "AI": 0.7, "AR": 0.9091, "BA": 0.8, "BD": 0.7422, "BI": 0.6821, "BJ": 0.5927, "BK": 0.1189, "BP": 0.7652, "BQ": 0.7068, "integral": 0.736}, {"channel": "Посевы", "format": "Видео + текст", "sreda": "Видео", "n": 1, "S": 0.7, "X": 0.4853, "AG": 0.0725, "AI": 0.68, "AR": 0.8571, "BA": 0.8462, "BD": 0.7005, "BI": 0.3207, "BJ": 0.3782, "BK": 0.0506, "BP": 0.3728, "BQ": 0.4006, "integral": 0.3867}, {"channel": "Посевы", "format": "Фото + текст", "sreda": "Текст", "n": 1, "S": 0.5, "X": 0.4853, "AG": 0.0725, "AI": 0.68, "AR": 0.8571, "BA": 0.8462, "BD": 0.7005, "BI": 0.2483, "BJ": 0.3782, "BK": 0.0506, "BP": 0.3088, "BQ": 0.3775, "integral": 0.3432}, {"channel": "Радио", "format": "Аудиоролик", "sreda": "Аудио", "n": 3, "S": 0.7, "X": 0.71, "AG": 0.3203, "AI": 0.75, "AR": 0.7273, "BA": 0.8308, "BD": 0.6254, "BI": 0.4503, "BJ": 0.2041, "BK": 0.5066, "BP": 0.716, "BQ": 0.5708, "integral": 0.6434}, {"channel": "Радио", "format": "Спонсорская заставка", "sreda": "Аудио", "n": 3, "S": 0.7, "X": 0.71, "AG": 0.2239, "AI": 0.8, "AR": 1.0, "BA": 0.8615, "BD": 0.8696, "BI": 0.455, "BJ": 0.3782, "BK": 0.152, "BP": 0.5486, "BQ": 0.4996, "integral": 0.5241}, {"channel": "Радио", "format": "Спонсорская интеграция", "sreda": "Аудио", "n": 1, "S": 0.7, "X": 0.71, "AG": 0.8382, "AI": 0.9, "AR": 1.0, "BA": 0.8615, "BD": 1.0, "BI": 0.7861, "BJ": 0.3782, "BK": 0.152, "BP": 0.8414, "BQ": 0.6049, "integral": 0.7231}, {"channel": "Социальные сети", "format": "Clips", "sreda": "Видео", "n": 3, "S": 1.0, "X": 0.6592, "AG": 0.0056, "AI": 0.24, "AR": 1.0, "BA": 0.7077, "BD": 0.6363, "BI": 0.1017, "BJ": 0.9328, "BK": 0.05, "BP": 0.268, "BQ": 0.7272, "integral": 0.4976}, {"channel": "Социальные сети", "format": "Видео InStream", "sreda": "Видео", "n": 6, "S": 1.0, "X": 0.7596, "AG": 0.1487, "AI": 0.8, "AR": 0.9091, "BA": 0.7077, "BD": 0.7422, "BI": 0.467, "BJ": 0.9328, "BK": 0.1, "BP": 0.6191, "BQ": 0.8711, "integral": 0.7451}, {"channel": "Социальные сети", "format": "Статика посты", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.5055, "AG": 0.0341, "AI": 0.51, "AR": 1.0, "BA": 0.7077, "BD": 0.4132, "BI": 0.1682, "BJ": 0.9328, "BK": 0.2, "BP": 0.4112, "BQ": 0.8318, "integral": 0.6215}, {"channel": "Социальные сети", "format": "Статика премиум", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.7508, "AG": 0.0337, "AI": 0.69, "AR": 1.0, "BA": 0.7077, "BD": 0.4132, "BI": 0.1851, "BJ": 0.9328, "BK": 0.2, "BP": 0.4261, "BQ": 0.8372, "integral": 0.6316}, {"channel": "Социальные сети", "format": "Статика стандарт (баннеры)", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.251, "AG": 0.0106, "AI": 0.23, "AR": 0.9091, "BA": 0.7077, "BD": 0.4132, "BI": 0.0835, "BJ": 0.9328, "BK": 0.2, "BP": 0.3363, "BQ": 0.8049, "integral": 0.5706}, {"channel": "ТВ", "format": "Ролик", "sreda": "Видео", "n": 8, "S": 1.0, "X": 0.6538, "AG": 0.3995, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.4991, "BJ": 0.2041, "BK": 0.6207, "BP": 0.8233, "BQ": 0.6498, "integral": 0.7366}, {"channel": "ТВ", "format": "Спонсорская заставка", "sreda": "Видео", "n": 4, "S": 1.0, "X": 0.6538, "AG": 0.212, "AI": 0.55, "AR": 1.0, "BA": 1.0, "BD": 0.828, "BI": 0.4689, "BJ": 0.3782, "BK": 0.3448, "BP": 0.6693, "BQ": 0.6113, "integral": 0.6403}, {"channel": "ТВ", "format": "Спонсорская интеграция", "sreda": "Видео", "n": 8, "S": 1.0, "X": 0.6538, "AG": 0.3995, "AI": 0.65, "AR": 1.0, "BA": 1.0, "BD": 0.8696, "BI": 0.6163, "BJ": 0.3782, "BK": 0.3448, "BP": 0.7997, "BQ": 0.6582, "integral": 0.7289}, {"channel": "Тематические ресурсы", "format": "Премиум, Fullscreen, брендирование страницы", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.8923, "AG": 0.0365, "AI": 1.0, "AR": 1.0, "BA": 0.6769, "BD": 0.2185, "BI": 0.1823, "BJ": 0.4555, "BK": 0.2177, "BP": 0.3569, "BQ": 0.5048, "integral": 0.4309}, {"channel": "Тематические ресурсы", "format": "Стандарт", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.4578, "AG": 0.0337, "AI": 0.23, "AR": 0.7273, "BA": 0.6769, "BD": 0.2185, "BI": 0.1428, "BJ": 0.4555, "BK": 0.2177, "BP": 0.3219, "BQ": 0.4922, "integral": 0.4071}, {"channel": "Геосервисы", "format": "Баннеры", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.297, "AG": 0.0227, "AI": 0.18, "AR": 1.0, "BA": 0.6615, "BD": 0.9012, "BI": 0.1515, "BJ": 0.5268, "BK": 0.1885, "BP": 0.3247, "BQ": 0.5298, "integral": 0.4272}, {"channel": "Геосервисы", "format": "Премиум", "sreda": "Статика", "n": 1, "S": 0.5, "X": 0.3382, "AG": 0.0245, "AI": 0.21, "AR": 1.0, "BA": 0.6615, "BD": 0.9012, "BI": 0.1607, "BJ": 0.5268, "BK": 0.1666, "BP": 0.3205, "BQ": 0.5205, "integral": 0.4205}], "detail": [{"channel": "TG", "format": "Текст", "sreda": "Текст", "dur": null, "S": 0.4, "X": 0.3834, "AG": 0.0314, "AI": 0.18, "AR": 1.0, "BA": 0.6769, "BD": 0.5637, "BI": 0.1529, "BJ": 0.8541, "BK": 0.0667, "BP": 0.31, "BQ": 0.6965, "integral": 0.5032}, {"channel": "TG", "format": "Текст+баннер", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.4853, "AG": 0.0255, "AI": 0.18, "AR": 1.0, "BA": 0.6769, "BD": 0.5637, "BI": 0.1558, "BJ": 0.8541, "BK": 0.0667, "BP": 0.3125, "BQ": 0.6974, "integral": 0.505}, {"channel": "TG", "format": "Текст+видео", "sreda": "Видео", "dur": 20.0, "S": 0.7, "X": 0.4853, "AG": 0.0902, "AI": 0.18, "AR": 1.0, "BA": 0.6769, "BD": 0.5637, "BI": 0.3318, "BJ": 0.8541, "BK": 0.0667, "BP": 0.4681, "BQ": 0.7533, "integral": 0.6107}, {"channel": "Баннеры", "format": "Баннер в Smart TV", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.2773, "AG": 0.0235, "AI": 0.12, "AR": 0.9091, "BA": 0.6462, "BD": 0.7422, "BI": 0.1339, "BJ": 0.4555, "BK": 0.1833, "BP": 0.2947, "BQ": 0.4702, "integral": 0.3825}, {"channel": "Баннеры", "format": "Мини-баннеры", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.251, "AG": 0.0094, "AI": 0.12, "AR": 0.7273, "BA": 0.6462, "BD": 0.1212, "BI": 0.0674, "BJ": 1.0, "BK": 0.3878, "BP": 0.4386, "BQ": 0.9523, "integral": 0.6954}, {"channel": "Баннеры", "format": "Премиум, Fullscreen, брендирование страницы", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.8923, "AG": 0.0365, "AI": 1.0, "AR": 1.0, "BA": 0.6462, "BD": 0.1212, "BI": 0.1758, "BJ": 0.8097, "BK": 0.2024, "BP": 0.3995, "BQ": 0.7475, "integral": 0.5735}, {"channel": "Баннеры", "format": "Премиум, Другие премиальные форматы", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.7508, "AG": 0.0337, "AI": 0.69, "AR": 0.9091, "BA": 0.6462, "BD": 0.1212, "BI": 0.1639, "BJ": 0.8097, "BK": 0.2024, "BP": 0.3889, "BQ": 0.7438, "integral": 0.5663}, {"channel": "Баннеры", "format": "Стандарт", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.4444, "AG": 0.0106, "AI": 0.23, "AR": 0.75, "BA": 0.6462, "BD": 0.1212, "BI": 0.0834, "BJ": 1.0, "BK": 0.2573, "BP": 0.3793, "BQ": 0.8848, "integral": 0.632}, {"channel": "Диджитал аудио", "format": "Аудио", "sreda": "Аудио", "dur": 30.0, "S": 0.7, "X": 0.7583, "AG": 0.5294, "AI": 0.85, "AR": 1.0, "BA": 0.6462, "BD": 0.828, "BI": 0.604, "BJ": 0.8097, "BK": 0.1005, "BP": 0.7208, "BQ": 0.827, "integral": 0.7739}, {"channel": "Диджитал аудио", "format": "Аудио", "sreda": "Аудио", "dur": 25.0, "S": 0.7, "X": 0.7583, "AG": 0.4657, "AI": 0.85, "AR": 1.0, "BA": 0.6462, "BD": 0.828, "BI": 0.5688, "BJ": 0.8097, "BK": 0.1005, "BP": 0.6896, "BQ": 0.8158, "integral": 0.7527}, {"channel": "Диджитал аудио", "format": "Аудио", "sreda": "Аудио", "dur": 20.0, "S": 0.7, "X": 0.7583, "AG": 0.3725, "AI": 0.85, "AR": 1.0, "BA": 0.6462, "BD": 0.828, "BI": 0.5274, "BJ": 0.8097, "BK": 0.1005, "BP": 0.653, "BQ": 0.8026, "integral": 0.7278}, {"channel": "Диджитал аудио", "format": "Аудио", "sreda": "Аудио", "dur": 15.0, "S": 0.7, "X": 0.7583, "AG": 0.2882, "AI": 0.85, "AR": 1.0, "BA": 0.6462, "BD": 0.828, "BI": 0.477, "BJ": 0.8097, "BK": 0.1005, "BP": 0.6084, "BQ": 0.7866, "integral": 0.6975}, {"channel": "Диджитал аудио", "format": "Аудио", "sreda": "Аудио", "dur": 10.0, "S": 0.7, "X": 0.7583, "AG": 0.1922, "AI": 0.85, "AR": 1.0, "BA": 0.6462, "BD": 0.828, "BI": 0.3905, "BJ": 0.8097, "BK": 0.1005, "BP": 0.532, "BQ": 0.7591, "integral": 0.6456}, {"channel": "Диджитал аудио", "format": "Аудио", "sreda": "Аудио", "dur": 5.0, "S": 0.7, "X": 0.7583, "AG": 0.098, "AI": 0.85, "AR": 1.0, "BA": 0.6462, "BD": 0.828, "BI": 0.3127, "BJ": 0.8097, "BK": 0.1005, "BP": 0.4631, "BQ": 0.7344, "integral": 0.5988}, {"channel": "Индор", "format": "ВУЗы", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.8249, "AG": 0.0392, "AI": 0.3, "AR": 0.7692, "BA": 0.8615, "BD": 0.8696, "BI": 0.2248, "BJ": 0.2041, "BK": 0.25, "BP": 0.3722, "BQ": 0.3565, "integral": 0.3643}, {"channel": "Индор", "format": "Метро", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.8249, "AG": 0.0588, "AI": 0.3, "AR": 0.7273, "BA": 0.8615, "BD": 0.7422, "BI": 0.2341, "BJ": 0.2041, "BK": 1.0, "BP": 0.8024, "BQ": 0.7766, "integral": 0.7895}, {"channel": "Индор", "format": "Супермаркеты", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.6405, "AG": 0.049, "AI": 0.3, "AR": 0.7368, "BA": 0.8615, "BD": 0.8119, "BI": 0.2171, "BJ": 0.2041, "BK": 0.2554, "BP": 0.3685, "BQ": 0.357, "integral": 0.3627}, {"channel": "Индор", "format": "ТЦ", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.529, "AG": 0.049, "AI": 0.3, "AR": 0.75, "BA": 0.8615, "BD": 0.6363, "BI": 0.1979, "BJ": 0.2041, "BK": 0.3303, "BP": 0.3936, "BQ": 0.3926, "integral": 0.3931}, {"channel": "Инфлюенсеры", "format": "Альт-ролл", "sreda": "Блогеры", "dur": 30.0, "S": 1.0, "X": 0.7596, "AG": 0.2647, "AI": 0.45, "AR": 0.8571, "BA": 0.9077, "BD": 1.0, "BI": 0.6659, "BJ": 0.3782, "BK": 0.0617, "BP": 0.6843, "BQ": 0.5165, "integral": 0.6004}, {"channel": "Инфлюенсеры", "format": "Альт-ролл", "sreda": "Блогеры", "dur": 25.0, "S": 1.0, "X": 0.7596, "AG": 0.2451, "AI": 0.45, "AR": 0.8571, "BA": 0.9077, "BD": 1.0, "BI": 0.6491, "BJ": 0.3782, "BK": 0.0617, "BP": 0.6694, "BQ": 0.5111, "integral": 0.5903}, {"channel": "Инфлюенсеры", "format": "Альт-ролл", "sreda": "Блогеры", "dur": 20.0, "S": 1.0, "X": 0.7596, "AG": 0.2157, "AI": 0.45, "AR": 0.8571, "BA": 0.9077, "BD": 1.0, "BI": 0.6212, "BJ": 0.3782, "BK": 0.0617, "BP": 0.6447, "BQ": 0.5022, "integral": 0.5735}, {"channel": "Инфлюенсеры", "format": "Альт-ролл", "sreda": "Блогеры", "dur": 15.0, "S": 1.0, "X": 0.7596, "AG": 0.1765, "AI": 0.45, "AR": 0.8571, "BA": 0.9077, "BD": 1.0, "BI": 0.5777, "BJ": 0.3782, "BK": 0.0617, "BP": 0.6063, "BQ": 0.4884, "integral": 0.5474}, {"channel": "Инфлюенсеры", "format": "Альт-ролл", "sreda": "Блогеры", "dur": 10.0, "S": 1.0, "X": 0.7596, "AG": 0.1275, "AI": 0.45, "AR": 0.8571, "BA": 0.9077, "BD": 1.0, "BI": 0.5123, "BJ": 0.3782, "BK": 0.0617, "BP": 0.5484, "BQ": 0.4676, "integral": 0.508}, {"channel": "Инфлюенсеры", "format": "Вертикальные видео", "sreda": "Блогеры", "dur": 30.0, "S": 1.0, "X": 0.7596, "AG": 0.3529, "AI": 0.57, "AR": 1.0, "BA": 0.9077, "BD": 0.773, "BI": 0.7024, "BJ": 0.3782, "BK": 0.0617, "BP": 0.7165, "BQ": 0.528, "integral": 0.6223}, {"channel": "Инфлюенсеры", "format": "Вертикальные видео", "sreda": "Блогеры", "dur": 25.0, "S": 1.0, "X": 0.6592, "AG": 0.3186, "AI": 0.57, "AR": 1.0, "BA": 0.9077, "BD": 0.773, "BI": 0.6552, "BJ": 0.3782, "BK": 0.0617, "BP": 0.6748, "BQ": 0.5131, "integral": 0.5939}, {"channel": "Инфлюенсеры", "format": "Вертикальные видео", "sreda": "Блогеры", "dur": 20.0, "S": 1.0, "X": 0.6592, "AG": 0.2745, "AI": 0.57, "AR": 1.0, "BA": 0.9077, "BD": 0.773, "BI": 0.6226, "BJ": 0.3782, "BK": 0.0617, "BP": 0.646, "BQ": 0.5027, "integral": 0.5743}, {"channel": "Инфлюенсеры", "format": "Вертикальные видео", "sreda": "Блогеры", "dur": 15.0, "S": 1.0, "X": 0.6592, "AG": 0.2206, "AI": 0.57, "AR": 1.0, "BA": 0.9077, "BD": 0.773, "BI": 0.576, "BJ": 0.3782, "BK": 0.0617, "BP": 0.6047, "BQ": 0.4879, "integral": 0.5463}, {"channel": "Инфлюенсеры", "format": "Вертикальные видео", "sreda": "Блогеры", "dur": 10.0, "S": 1.0, "X": 0.6592, "AG": 0.1569, "AI": 0.57, "AR": 1.0, "BA": 0.9077, "BD": 0.773, "BI": 0.5083, "BJ": 0.3782, "BK": 0.0617, "BP": 0.5449, "BQ": 0.4664, "integral": 0.5056}, {"channel": "Инфлюенсеры", "format": "Вертикальные видео", "sreda": "Блогеры", "dur": 5.0, "S": 1.0, "X": 0.6592, "AG": 0.0833, "AI": 0.57, "AR": 1.0, "BA": 0.9077, "BD": 0.773, "BI": 0.3999, "BJ": 0.3782, "BK": 0.0617, "BP": 0.449, "BQ": 0.4319, "integral": 0.4405}, {"channel": "Инфлюенсеры", "format": "Интеграции", "sreda": "Блогеры", "dur": 120.0, "S": 1.0, "X": 0.7596, "AG": 0.8471, "AI": 0.4, "AR": 1.0, "BA": 0.9077, "BD": 1.0, "BI": 1.0, "BJ": 0.3782, "BK": 0.0617, "BP": 0.9796, "BQ": 0.6226, "integral": 0.8011}, {"channel": "Инфлюенсеры", "format": "Интеграции", "sreda": "Блогеры", "dur": 90.0, "S": 1.0, "X": 0.7596, "AG": 0.6706, "AI": 0.4, "AR": 1.0, "BA": 0.9077, "BD": 1.0, "BI": 0.9639, "BJ": 0.3782, "BK": 0.0617, "BP": 0.9477, "BQ": 0.6112, "integral": 0.7794}, {"channel": "Инфлюенсеры", "format": "Интеграции", "sreda": "Блогеры", "dur": 60.0, "S": 1.0, "X": 0.7596, "AG": 0.4706, "AI": 0.4, "AR": 1.0, "BA": 0.9077, "BD": 1.0, "BI": 0.8912, "BJ": 0.3782, "BK": 0.0617, "BP": 0.8835, "BQ": 0.5881, "integral": 0.7358}, {"channel": "Инфлюенсеры", "format": "Интеграции", "sreda": "Блогеры", "dur": 30.0, "S": 1.0, "X": 0.7596, "AG": 0.2647, "AI": 0.4, "AR": 1.0, "BA": 0.9077, "BD": 1.0, "BI": 0.7461, "BJ": 0.3782, "BK": 0.0617, "BP": 0.7552, "BQ": 0.5419, "integral": 0.6486}, {"channel": "Маркетплейсы", "format": "Видеобаннер", "sreda": "Видео", "dur": 30.0, "S": 0.7, "X": 0.6438, "AG": 0.0588, "AI": 0.25, "AR": 0.8, "BA": 0.6462, "BD": 0.0, "BI": 0.2506, "BJ": 0.895, "BK": 0.089, "BP": 0.4155, "BQ": 0.7692, "integral": 0.5924}, {"channel": "Маркетплейсы", "format": "Видеобаннер", "sreda": "Видео", "dur": 25.0, "S": 0.7, "X": 0.6438, "AG": 0.0588, "AI": 0.25, "AR": 0.8, "BA": 0.6462, "BD": 0.0, "BI": 0.2453, "BJ": 0.895, "BK": 0.089, "BP": 0.4108, "BQ": 0.7675, "integral": 0.5892}, {"channel": "Маркетплейсы", "format": "Видеобаннер", "sreda": "Видео", "dur": 20.0, "S": 0.7, "X": 0.6438, "AG": 0.0588, "AI": 0.25, "AR": 0.8, "BA": 0.6462, "BD": 0.0, "BI": 0.243, "BJ": 0.895, "BK": 0.089, "BP": 0.4088, "BQ": 0.7668, "integral": 0.5878}, {"channel": "Маркетплейсы", "format": "Видеобаннер", "sreda": "Видео", "dur": 15.0, "S": 0.7, "X": 0.6438, "AG": 0.0471, "AI": 0.25, "AR": 0.8, "BA": 0.6462, "BD": 0.0, "BI": 0.215, "BJ": 0.895, "BK": 0.089, "BP": 0.3841, "BQ": 0.7579, "integral": 0.571}, {"channel": "Маркетплейсы", "format": "Видеобаннер", "sreda": "Видео", "dur": 10.0, "S": 0.7, "X": 0.6438, "AG": 0.0333, "AI": 0.25, "AR": 0.8, "BA": 0.6462, "BD": 0.0, "BI": 0.1732, "BJ": 0.895, "BK": 0.089, "BP": 0.3471, "BQ": 0.7446, "integral": 0.5459}, {"channel": "Маркетплейсы", "format": "Статика премиум", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.7239, "AG": 0.0337, "AI": 0.25, "AR": 0.8, "BA": 0.6462, "BD": 0.0, "BI": 0.1522, "BJ": 0.895, "BK": 0.1335, "BP": 0.3535, "BQ": 0.7627, "integral": 0.5581}, {"channel": "Маркетплейсы", "format": "Статика стандарт", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.4444, "AG": 0.0106, "AI": 0.25, "AR": 0.75, "BA": 0.6462, "BD": 0.0, "BI": 0.0805, "BJ": 0.895, "BK": 0.1335, "BP": 0.2901, "BQ": 0.7399, "integral": 0.515}, {"channel": "Наружная реклама (водители)", "format": "Билборд (статика)", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.2812, "AG": 0.0216, "AI": 0.05, "AR": 0.7368, "BA": 0.8615, "BD": 0.2185, "BI": 0.114, "BJ": 0.1061, "BK": 0.949, "BP": 0.6517, "BQ": 0.6399, "integral": 0.6458}, {"channel": "Наружная реклама (водители)", "format": "Биллборд (цифра)", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.2812, "AG": 0.0275, "AI": 0.05, "AR": 0.7368, "BA": 0.8615, "BD": 0.2185, "BI": 0.1224, "BJ": 0.1061, "BK": 0.949, "BP": 0.6592, "BQ": 0.6426, "integral": 0.6509}, {"channel": "Наружная реклама (водители)", "format": "Медиафасад", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.8432, "AG": 0.0667, "AI": 0.1, "AR": 0.8571, "BA": 0.8615, "BD": 0.2185, "BI": 0.2089, "BJ": 0.1061, "BK": 0.4857, "BP": 0.475, "BQ": 0.4124, "integral": 0.4437}, {"channel": "Наружная реклама (водители)", "format": "Ситиформат (цифра)", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.2812, "AG": 0.0186, "AI": 0.05, "AR": 0.7368, "BA": 0.8615, "BD": 0.2185, "BI": 0.1096, "BJ": 0.1061, "BK": 0.3163, "BP": 0.2919, "BQ": 0.2867, "integral": 0.2893}, {"channel": "Наружная реклама (пешеходы)", "format": "Билборд (статика)", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.3579, "AG": 0.0294, "AI": 0.15, "AR": 0.7273, "BA": 0.8615, "BD": 0.4132, "BI": 0.136, "BJ": 0.1061, "BK": 0.949, "BP": 0.6712, "BQ": 0.6469, "integral": 0.6591}, {"channel": "Наружная реклама (пешеходы)", "format": "Биллборд (цифра)", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.3579, "AG": 0.0294, "AI": 0.15, "AR": 0.7273, "BA": 0.8615, "BD": 0.4132, "BI": 0.1391, "BJ": 0.1061, "BK": 0.949, "BP": 0.6739, "BQ": 0.6479, "integral": 0.6609}, {"channel": "Наружная реклама (пешеходы)", "format": "Медиафасад", "sreda": "Статика", "dur": null, "S": 0.5, "X": 1.0, "AG": 0.0863, "AI": 0.25, "AR": 0.8571, "BA": 0.8615, "BD": 0.4132, "BI": 0.2315, "BJ": 0.1061, "BK": 0.4857, "BP": 0.495, "BQ": 0.4196, "integral": 0.4573}, {"channel": "Наружная реклама (пешеходы)", "format": "Ситиформат (цифра)", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.3579, "AG": 0.0392, "AI": 0.15, "AR": 0.7273, "BA": 0.8615, "BD": 0.4132, "BI": 0.144, "BJ": 0.1061, "BK": 0.3163, "BP": 0.3223, "BQ": 0.2976, "integral": 0.31}, {"channel": "Онлайн-видео", "format": "Аут-стрим онлайн-видео (Skip)", "sreda": "Видео", "dur": 30.0, "S": 0.7, "X": 0.713, "AG": 0.0353, "AI": 0.44, "AR": 0.7368, "BA": 0.7385, "BD": 0.4132, "BI": 0.2252, "BJ": 1.0, "BK": 0.1716, "BP": 0.4564, "BQ": 0.8821, "integral": 0.6692}, {"channel": "Онлайн-видео", "format": "Аут-стрим онлайн-видео (Skip)", "sreda": "Видео", "dur": 25.0, "S": 0.7, "X": 0.713, "AG": 0.0343, "AI": 0.44, "AR": 0.7368, "BA": 0.7385, "BD": 0.4132, "BI": 0.2171, "BJ": 1.0, "BK": 0.1716, "BP": 0.4492, "BQ": 0.8796, "integral": 0.6644}, {"channel": "Онлайн-видео", "format": "Аут-стрим онлайн-видео (Skip)", "sreda": "Видео", "dur": 20.0, "S": 0.7, "X": 0.713, "AG": 0.0314, "AI": 0.44, "AR": 0.7368, "BA": 0.7385, "BD": 0.4132, "BI": 0.2065, "BJ": 1.0, "BK": 0.1716, "BP": 0.4399, "BQ": 0.8762, "integral": 0.658}, {"channel": "Онлайн-видео", "format": "Аут-стрим онлайн-видео (Skip)", "sreda": "Видео", "dur": 15.0, "S": 0.7, "X": 0.713, "AG": 0.0294, "AI": 0.44, "AR": 0.7368, "BA": 0.7385, "BD": 0.4132, "BI": 0.1936, "BJ": 1.0, "BK": 0.1716, "BP": 0.4284, "BQ": 0.8721, "integral": 0.6503}, {"channel": "Онлайн-видео", "format": "Аут-стрим онлайн-видео (Skip)", "sreda": "Видео", "dur": 10.0, "S": 0.7, "X": 0.713, "AG": 0.0255, "AI": 0.44, "AR": 0.7368, "BA": 0.7385, "BD": 0.4132, "BI": 0.1701, "BJ": 1.0, "BK": 0.1716, "BP": 0.4077, "BQ": 0.8646, "integral": 0.6362}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео Skip", "sreda": "Видео", "dur": 30.0, "S": 1.0, "X": 0.713, "AG": 0.2059, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.5568, "BJ": 1.0, "BK": 0.1512, "BP": 0.7381, "BQ": 0.9762, "integral": 0.8572}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео Skip", "sreda": "Видео", "dur": 25.0, "S": 1.0, "X": 0.713, "AG": 0.1961, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.5338, "BJ": 1.0, "BK": 0.1512, "BP": 0.7178, "BQ": 0.9689, "integral": 0.8433}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео Skip", "sreda": "Видео", "dur": 20.0, "S": 1.0, "X": 0.713, "AG": 0.1765, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.5061, "BJ": 1.0, "BK": 0.1512, "BP": 0.6933, "BQ": 0.9601, "integral": 0.8267}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео Skip", "sreda": "Видео", "dur": 15.0, "S": 1.0, "X": 0.713, "AG": 0.1471, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.4625, "BJ": 1.0, "BK": 0.1512, "BP": 0.6547, "BQ": 0.9463, "integral": 0.8005}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео Skip", "sreda": "Видео", "dur": 10.0, "S": 1.0, "X": 0.713, "AG": 0.1078, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.3841, "BJ": 1.0, "BK": 0.1512, "BP": 0.5855, "BQ": 0.9214, "integral": 0.7534}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео UnSkip", "sreda": "Видео", "dur": 30.0, "S": 1.0, "X": 0.6709, "AG": 0.4706, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.6391, "BJ": 1.0, "BK": 0.1469, "BP": 0.8085, "BQ": 1.0, "integral": 0.9042}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео UnSkip", "sreda": "Видео", "dur": 25.0, "S": 1.0, "X": 0.6709, "AG": 0.4167, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.6008, "BJ": 1.0, "BK": 0.1469, "BP": 0.7746, "BQ": 0.9878, "integral": 0.8812}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео UnSkip", "sreda": "Видео", "dur": 20.0, "S": 1.0, "X": 0.6709, "AG": 0.3529, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.5603, "BJ": 1.0, "BK": 0.1469, "BP": 0.7388, "BQ": 0.975, "integral": 0.8569}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео UnSkip", "sreda": "Видео", "dur": 15.0, "S": 1.0, "X": 0.6709, "AG": 0.2735, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.506, "BJ": 1.0, "BK": 0.1469, "BP": 0.6908, "BQ": 0.9577, "integral": 0.8243}, {"channel": "Онлайн-видео", "format": "Ин-стрим онлайн-видео UnSkip", "sreda": "Видео", "dur": 10.0, "S": 1.0, "X": 0.713, "AG": 0.1863, "AI": 0.96, "AR": 0.9091, "BA": 0.7385, "BD": 0.7422, "BI": 0.4215, "BJ": 1.0, "BK": 0.1469, "BP": 0.6161, "BQ": 0.9309, "integral": 0.7735}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (smart, streaming)", "sreda": "Видео", "dur": 60.0, "S": 1.0, "X": 0.6538, "AG": 1.0, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.6978, "BJ": 0.5927, "BK": 0.1658, "BP": 0.8055, "BQ": 0.7379, "integral": 0.7717}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (smart, streaming)", "sreda": "Видео", "dur": 45.0, "S": 1.0, "X": 0.6538, "AG": 0.7676, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.6552, "BJ": 0.5927, "BK": 0.1658, "BP": 0.7679, "BQ": 0.7243, "integral": 0.7461}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (smart, streaming)", "sreda": "Видео", "dur": 40.0, "S": 1.0, "X": 0.6538, "AG": 0.698, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.6373, "BJ": 0.5927, "BK": 0.1658, "BP": 0.752, "BQ": 0.7187, "integral": 0.7353}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (smart, streaming)", "sreda": "Видео", "dur": 35.0, "S": 1.0, "X": 0.6538, "AG": 0.6245, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.5979, "BJ": 0.5927, "BK": 0.1658, "BP": 0.7172, "BQ": 0.7061, "integral": 0.7117}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (smart, streaming)", "sreda": "Видео", "dur": 30.0, "S": 1.0, "X": 0.6538, "AG": 0.5471, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.5612, "BJ": 0.5927, "BK": 0.1658, "BP": 0.6847, "BQ": 0.6945, "integral": 0.6896}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (smart, streaming)", "sreda": "Видео", "dur": 25.0, "S": 1.0, "X": 0.6538, "AG": 0.4657, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.5252, "BJ": 0.5927, "BK": 0.1658, "BP": 0.6529, "BQ": 0.683, "integral": 0.668}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (smart, streaming)", "sreda": "Видео", "dur": 20.0, "S": 1.0, "X": 0.6538, "AG": 0.3804, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.4879, "BJ": 0.5927, "BK": 0.1658, "BP": 0.62, "BQ": 0.6712, "integral": 0.6456}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (smart, streaming)", "sreda": "Видео", "dur": 15.0, "S": 1.0, "X": 0.6538, "AG": 0.2882, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.4398, "BJ": 0.5927, "BK": 0.1658, "BP": 0.5774, "BQ": 0.6559, "integral": 0.6166}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (smart, streaming)", "sreda": "Видео", "dur": 10.0, "S": 1.0, "X": 0.6538, "AG": 0.1922, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.3601, "BJ": 0.5927, "BK": 0.1658, "BP": 0.5069, "BQ": 0.6305, "integral": 0.5687}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (web, app)", "sreda": "Видео", "dur": 60.0, "S": 1.0, "X": 0.8673, "AG": 0.8824, "AI": 0.7, "AR": 0.9091, "BA": 0.8, "BD": 0.7422, "BI": 0.8622, "BJ": 0.5927, "BK": 0.1189, "BP": 0.9245, "BQ": 0.7641, "integral": 0.8443}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (web, app)", "sreda": "Видео", "dur": 45.0, "S": 1.0, "X": 0.8673, "AG": 0.6882, "AI": 0.7, "AR": 0.9091, "BA": 0.8, "BD": 0.7422, "BI": 0.8113, "BJ": 0.5927, "BK": 0.1189, "BP": 0.8795, "BQ": 0.7479, "integral": 0.8137}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (web, app)", "sreda": "Видео", "dur": 40.0, "S": 1.0, "X": 0.8673, "AG": 0.6275, "AI": 0.7, "AR": 0.9091, "BA": 0.8, "BD": 0.7422, "BI": 0.7895, "BJ": 0.5927, "BK": 0.1189, "BP": 0.8602, "BQ": 0.741, "integral": 0.8006}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (web, app)", "sreda": "Видео", "dur": 35.0, "S": 1.0, "X": 0.8673, "AG": 0.549, "AI": 0.7, "AR": 0.9091, "BA": 0.8, "BD": 0.7422, "BI": 0.739, "BJ": 0.5927, "BK": 0.1189, "BP": 0.8155, "BQ": 0.7249, "integral": 0.7702}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (web, app)", "sreda": "Видео", "dur": 30.0, "S": 1.0, "X": 0.8673, "AG": 0.4706, "AI": 0.7, "AR": 0.9091, "BA": 0.8, "BD": 0.7422, "BI": 0.692, "BJ": 0.5927, "BK": 0.1189, "BP": 0.774, "BQ": 0.71, "integral": 0.742}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (web, app)", "sreda": "Видео", "dur": 25.0, "S": 1.0, "X": 0.8673, "AG": 0.4069, "AI": 0.7, "AR": 0.9091, "BA": 0.8, "BD": 0.7422, "BI": 0.6488, "BJ": 0.5927, "BK": 0.1189, "BP": 0.7358, "BQ": 0.6962, "integral": 0.716}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (web, app)", "sreda": "Видео", "dur": 20.0, "S": 1.0, "X": 0.8673, "AG": 0.3333, "AI": 0.7, "AR": 0.9091, "BA": 0.8, "BD": 0.7422, "BI": 0.6029, "BJ": 0.5927, "BK": 0.1189, "BP": 0.6953, "BQ": 0.6817, "integral": 0.6885}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (web, app)", "sreda": "Видео", "dur": 15.0, "S": 1.0, "X": 0.8673, "AG": 0.2647, "AI": 0.7, "AR": 0.9091, "BA": 0.8, "BD": 0.7422, "BI": 0.546, "BJ": 0.5927, "BK": 0.1189, "BP": 0.6449, "BQ": 0.6636, "integral": 0.6542}, {"channel": "Онлайн-видео", "format": "Онлайн-кинотеатры (web, app)", "sreda": "Видео", "dur": 10.0, "S": 1.0, "X": 0.8673, "AG": 0.1765, "AI": 0.7, "AR": 0.9091, "BA": 0.8, "BD": 0.7422, "BI": 0.4468, "BJ": 0.5927, "BK": 0.1189, "BP": 0.5572, "BQ": 0.632, "integral": 0.5946}, {"channel": "Посевы", "format": "Видео + текст", "sreda": "Видео", "dur": 20.0, "S": 0.7, "X": 0.4853, "AG": 0.0725, "AI": 0.68, "AR": 0.8571, "BA": 0.8462, "BD": 0.7005, "BI": 0.3207, "BJ": 0.3782, "BK": 0.0506, "BP": 0.3728, "BQ": 0.4006, "integral": 0.3867}, {"channel": "Посевы", "format": "Фото + текст", "sreda": "Текст", "dur": null, "S": 0.5, "X": 0.4853, "AG": 0.0725, "AI": 0.68, "AR": 0.8571, "BA": 0.8462, "BD": 0.7005, "BI": 0.2483, "BJ": 0.3782, "BK": 0.0506, "BP": 0.3088, "BQ": 0.3775, "integral": 0.3432}, {"channel": "Радио", "format": "Аудиоролик", "sreda": "Аудио", "dur": 30.0, "S": 0.7, "X": 0.71, "AG": 0.4706, "AI": 0.75, "AR": 0.7273, "BA": 0.8308, "BD": 0.6254, "BI": 0.537, "BJ": 0.2041, "BK": 0.5066, "BP": 0.7926, "BQ": 0.5984, "integral": 0.6955}, {"channel": "Радио", "format": "Аудиоролик", "sreda": "Аудио", "dur": 20.0, "S": 0.7, "X": 0.71, "AG": 0.3137, "AI": 0.75, "AR": 0.7273, "BA": 0.8308, "BD": 0.6254, "BI": 0.4646, "BJ": 0.2041, "BK": 0.5066, "BP": 0.7286, "BQ": 0.5754, "integral": 0.652}, {"channel": "Радио", "format": "Аудиоролик", "sreda": "Аудио", "dur": 10.0, "S": 0.7, "X": 0.71, "AG": 0.1765, "AI": 0.75, "AR": 0.7273, "BA": 0.8308, "BD": 0.6254, "BI": 0.3493, "BJ": 0.2041, "BK": 0.5066, "BP": 0.6267, "BQ": 0.5388, "integral": 0.5827}, {"channel": "Радио", "format": "Спонсорская заставка", "sreda": "Аудио", "dur": 20.0, "S": 0.7, "X": 0.71, "AG": 0.3137, "AI": 0.8, "AR": 1.0, "BA": 0.8615, "BD": 0.8696, "BI": 0.5408, "BJ": 0.3782, "BK": 0.152, "BP": 0.6245, "BQ": 0.5269, "integral": 0.5757}, {"channel": "Радио", "format": "Спонсорская заставка", "sreda": "Аудио", "dur": 15.0, "S": 0.7, "X": 0.71, "AG": 0.2647, "AI": 0.8, "AR": 1.0, "BA": 0.8615, "BD": 0.8696, "BI": 0.4968, "BJ": 0.3782, "BK": 0.152, "BP": 0.5855, "BQ": 0.5129, "integral": 0.5492}, {"channel": "Радио", "format": "Спонсорская заставка", "sreda": "Аудио", "dur": 5.0, "S": 0.7, "X": 0.71, "AG": 0.0931, "AI": 0.8, "AR": 1.0, "BA": 0.8615, "BD": 0.8696, "BI": 0.3274, "BJ": 0.3782, "BK": 0.152, "BP": 0.4358, "BQ": 0.4591, "integral": 0.4474}, {"channel": "Радио", "format": "Спонсорская интеграция", "sreda": "Аудио", "dur": 45.0, "S": 0.7, "X": 0.71, "AG": 0.8382, "AI": 0.9, "AR": 1.0, "BA": 0.8615, "BD": 1.0, "BI": 0.7861, "BJ": 0.3782, "BK": 0.152, "BP": 0.8414, "BQ": 0.6049, "integral": 0.7231}, {"channel": "Социальные сети", "format": "Clips", "sreda": "Видео", "dur": 15.0, "S": 1.0, "X": 0.6592, "AG": 0.0059, "AI": 0.24, "AR": 1.0, "BA": 0.7077, "BD": 0.6363, "BI": 0.1081, "BJ": 0.9328, "BK": 0.05, "BP": 0.2737, "BQ": 0.7293, "integral": 0.5015}, {"channel": "Социальные сети", "format": "Clips", "sreda": "Видео", "dur": 10.0, "S": 1.0, "X": 0.6592, "AG": 0.0059, "AI": 0.24, "AR": 1.0, "BA": 0.7077, "BD": 0.6363, "BI": 0.0996, "BJ": 0.9328, "BK": 0.05, "BP": 0.2661, "BQ": 0.7265, "integral": 0.4963}, {"channel": "Социальные сети", "format": "Clips", "sreda": "Видео", "dur": 5.0, "S": 1.0, "X": 0.6592, "AG": 0.0049, "AI": 0.24, "AR": 1.0, "BA": 0.7077, "BD": 0.6363, "BI": 0.0975, "BJ": 0.9328, "BK": 0.05, "BP": 0.2643, "BQ": 0.7259, "integral": 0.4951}, {"channel": "Социальные сети", "format": "Видео InStream", "sreda": "Видео", "dur": 30.0, "S": 1.0, "X": 0.7596, "AG": 0.2059, "AI": 0.8, "AR": 0.9091, "BA": 0.7077, "BD": 0.7422, "BI": 0.5757, "BJ": 0.9328, "BK": 0.1, "BP": 0.7152, "BQ": 0.9057, "integral": 0.8105}, {"channel": "Социальные сети", "format": "Видео InStream", "sreda": "Видео", "dur": 25.0, "S": 1.0, "X": 0.7596, "AG": 0.1961, "AI": 0.8, "AR": 0.9091, "BA": 0.7077, "BD": 0.7422, "BI": 0.5496, "BJ": 0.9328, "BK": 0.1, "BP": 0.6921, "BQ": 0.8974, "integral": 0.7948}, {"channel": "Социальные сети", "format": "Видео InStream", "sreda": "Видео", "dur": 20.0, "S": 1.0, "X": 0.7596, "AG": 0.1765, "AI": 0.8, "AR": 0.9091, "BA": 0.7077, "BD": 0.7422, "BI": 0.5101, "BJ": 0.9328, "BK": 0.1, "BP": 0.6572, "BQ": 0.8848, "integral": 0.771}, {"channel": "Социальные сети", "format": "Видео InStream", "sreda": "Видео", "dur": 15.0, "S": 1.0, "X": 0.7596, "AG": 0.1471, "AI": 0.8, "AR": 0.9091, "BA": 0.7077, "BD": 0.7422, "BI": 0.4662, "BJ": 0.9328, "BK": 0.1, "BP": 0.6184, "BQ": 0.8709, "integral": 0.7446}, {"channel": "Социальные сети", "format": "Видео InStream", "sreda": "Видео", "dur": 10.0, "S": 1.0, "X": 0.7596, "AG": 0.1078, "AI": 0.8, "AR": 0.9091, "BA": 0.7077, "BD": 0.7422, "BI": 0.3872, "BJ": 0.9328, "BK": 0.1, "BP": 0.5485, "BQ": 0.8458, "integral": 0.6972}, {"channel": "Социальные сети", "format": "Видео InStream", "sreda": "Видео", "dur": 5.0, "S": 1.0, "X": 0.7596, "AG": 0.0588, "AI": 0.8, "AR": 0.9091, "BA": 0.7077, "BD": 0.7422, "BI": 0.3134, "BJ": 0.9328, "BK": 0.1, "BP": 0.4833, "BQ": 0.8223, "integral": 0.6528}, {"channel": "Социальные сети", "format": "Статика посты", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.5055, "AG": 0.0341, "AI": 0.51, "AR": 1.0, "BA": 0.7077, "BD": 0.4132, "BI": 0.1682, "BJ": 0.9328, "BK": 0.2, "BP": 0.4112, "BQ": 0.8318, "integral": 0.6215}, {"channel": "Социальные сети", "format": "Статика премиум", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.7508, "AG": 0.0337, "AI": 0.69, "AR": 1.0, "BA": 0.7077, "BD": 0.4132, "BI": 0.1851, "BJ": 0.9328, "BK": 0.2, "BP": 0.4261, "BQ": 0.8372, "integral": 0.6316}, {"channel": "Социальные сети", "format": "Статика стандарт (баннеры)", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.251, "AG": 0.0106, "AI": 0.23, "AR": 0.9091, "BA": 0.7077, "BD": 0.4132, "BI": 0.0835, "BJ": 0.9328, "BK": 0.2, "BP": 0.3363, "BQ": 0.8049, "integral": 0.5706}, {"channel": "ТВ", "format": "Ролик", "sreda": "Видео", "dur": 60.0, "S": 1.0, "X": 0.6538, "AG": 0.8235, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.6825, "BJ": 0.2041, "BK": 0.6207, "BP": 0.9855, "BQ": 0.7081, "integral": 0.8468}, {"channel": "ТВ", "format": "Ролик", "sreda": "Видео", "dur": 45.0, "S": 1.0, "X": 0.6538, "AG": 0.6618, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.6447, "BJ": 0.2041, "BK": 0.6207, "BP": 0.9521, "BQ": 0.6961, "integral": 0.8241}, {"channel": "ТВ", "format": "Ролик", "sreda": "Видео", "dur": 30.0, "S": 1.0, "X": 0.6538, "AG": 0.4706, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.5818, "BJ": 0.2041, "BK": 0.6207, "BP": 0.8964, "BQ": 0.6761, "integral": 0.7863}, {"channel": "ТВ", "format": "Ролик", "sreda": "Видео", "dur": 25.0, "S": 1.0, "X": 0.6538, "AG": 0.3922, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.5268, "BJ": 0.2041, "BK": 0.6207, "BP": 0.8478, "BQ": 0.6587, "integral": 0.7533}, {"channel": "ТВ", "format": "Ролик", "sreda": "Видео", "dur": 20.0, "S": 1.0, "X": 0.6538, "AG": 0.3137, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.4779, "BJ": 0.2041, "BK": 0.6207, "BP": 0.8045, "BQ": 0.6431, "integral": 0.7238}, {"channel": "ТВ", "format": "Ролик", "sreda": "Видео", "dur": 15.0, "S": 1.0, "X": 0.6538, "AG": 0.2647, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.4359, "BJ": 0.2041, "BK": 0.6207, "BP": 0.7674, "BQ": 0.6298, "integral": 0.6986}, {"channel": "ТВ", "format": "Ролик", "sreda": "Видео", "dur": 10.0, "S": 1.0, "X": 0.6538, "AG": 0.1765, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.3567, "BJ": 0.2041, "BK": 0.6207, "BP": 0.6974, "BQ": 0.6046, "integral": 0.651}, {"channel": "ТВ", "format": "Ролик", "sreda": "Видео", "dur": 5.0, "S": 1.0, "X": 0.6538, "AG": 0.0931, "AI": 0.45, "AR": 0.7368, "BA": 0.9692, "BD": 0.5512, "BI": 0.2864, "BJ": 0.2041, "BK": 0.6207, "BP": 0.6353, "BQ": 0.5822, "integral": 0.6088}, {"channel": "ТВ", "format": "Спонсорская заставка", "sreda": "Видео", "dur": 20.0, "S": 1.0, "X": 0.6538, "AG": 0.3137, "AI": 0.55, "AR": 1.0, "BA": 1.0, "BD": 0.828, "BI": 0.5757, "BJ": 0.3782, "BK": 0.3448, "BP": 0.7638, "BQ": 0.6452, "integral": 0.7045}, {"channel": "ТВ", "format": "Спонсорская заставка", "sreda": "Видео", "dur": 15.0, "S": 1.0, "X": 0.6538, "AG": 0.2647, "AI": 0.55, "AR": 1.0, "BA": 1.0, "BD": 0.828, "BI": 0.5251, "BJ": 0.3782, "BK": 0.3448, "BP": 0.7191, "BQ": 0.6292, "integral": 0.6741}, {"channel": "ТВ", "format": "Спонсорская заставка", "sreda": "Видео", "dur": 10.0, "S": 1.0, "X": 0.6538, "AG": 0.1765, "AI": 0.55, "AR": 1.0, "BA": 1.0, "BD": 0.828, "BI": 0.4297, "BJ": 0.3782, "BK": 0.3448, "BP": 0.6347, "BQ": 0.5988, "integral": 0.6168}, {"channel": "ТВ", "format": "Спонсорская заставка", "sreda": "Видео", "dur": 5.0, "S": 1.0, "X": 0.6538, "AG": 0.0931, "AI": 0.55, "AR": 1.0, "BA": 1.0, "BD": 0.828, "BI": 0.3451, "BJ": 0.3782, "BK": 0.3448, "BP": 0.5599, "BQ": 0.5719, "integral": 0.5659}, {"channel": "ТВ", "format": "Спонсорская интеграция", "sreda": "Видео", "dur": 60.0, "S": 1.0, "X": 0.6538, "AG": 0.8235, "AI": 0.65, "AR": 1.0, "BA": 1.0, "BD": 0.8696, "BI": 0.8429, "BJ": 0.3782, "BK": 0.3448, "BP": 1.0, "BQ": 0.7302, "integral": 0.8651}, {"channel": "ТВ", "format": "Спонсорская интеграция", "sreda": "Видео", "dur": 45.0, "S": 1.0, "X": 0.6538, "AG": 0.6618, "AI": 0.65, "AR": 1.0, "BA": 1.0, "BD": 0.8696, "BI": 0.7962, "BJ": 0.3782, "BK": 0.3448, "BP": 0.9587, "BQ": 0.7153, "integral": 0.837}, {"channel": "ТВ", "format": "Спонсорская интеграция", "sreda": "Видео", "dur": 30.0, "S": 1.0, "X": 0.6538, "AG": 0.4706, "AI": 0.65, "AR": 1.0, "BA": 1.0, "BD": 0.8696, "BI": 0.7185, "BJ": 0.3782, "BK": 0.3448, "BP": 0.89, "BQ": 0.6906, "integral": 0.7903}, {"channel": "ТВ", "format": "Спонсорская интеграция", "sreda": "Видео", "dur": 25.0, "S": 1.0, "X": 0.6538, "AG": 0.3922, "AI": 0.65, "AR": 1.0, "BA": 1.0, "BD": 0.8696, "BI": 0.6506, "BJ": 0.3782, "BK": 0.3448, "BP": 0.83, "BQ": 0.6691, "integral": 0.7495}, {"channel": "ТВ", "format": "Спонсорская интеграция", "sreda": "Видео", "dur": 20.0, "S": 1.0, "X": 0.6538, "AG": 0.3137, "AI": 0.65, "AR": 1.0, "BA": 1.0, "BD": 0.8696, "BI": 0.5901, "BJ": 0.3782, "BK": 0.3448, "BP": 0.7765, "BQ": 0.6498, "integral": 0.7132}, {"channel": "ТВ", "format": "Спонсорская интеграция", "sreda": "Видео", "dur": 15.0, "S": 1.0, "X": 0.6538, "AG": 0.2647, "AI": 0.65, "AR": 1.0, "BA": 1.0, "BD": 0.8696, "BI": 0.5383, "BJ": 0.3782, "BK": 0.3448, "BP": 0.7307, "BQ": 0.6334, "integral": 0.682}, {"channel": "ТВ", "format": "Спонсорская интеграция", "sreda": "Видео", "dur": 10.0, "S": 1.0, "X": 0.6538, "AG": 0.1765, "AI": 0.65, "AR": 1.0, "BA": 1.0, "BD": 0.8696, "BI": 0.4405, "BJ": 0.3782, "BK": 0.3448, "BP": 0.6442, "BQ": 0.6023, "integral": 0.6233}, {"channel": "ТВ", "format": "Спонсорская интеграция", "sreda": "Видео", "dur": 5.0, "S": 1.0, "X": 0.6538, "AG": 0.0931, "AI": 0.65, "AR": 1.0, "BA": 1.0, "BD": 0.8696, "BI": 0.3537, "BJ": 0.3782, "BK": 0.3448, "BP": 0.5675, "BQ": 0.5747, "integral": 0.5711}, {"channel": "Тематические ресурсы", "format": "Премиум, Fullscreen, брендирование страницы", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.8923, "AG": 0.0365, "AI": 1.0, "AR": 1.0, "BA": 0.6769, "BD": 0.2185, "BI": 0.1823, "BJ": 0.4555, "BK": 0.2177, "BP": 0.3569, "BQ": 0.5048, "integral": 0.4309}, {"channel": "Тематические ресурсы", "format": "Стандарт", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.4578, "AG": 0.0337, "AI": 0.23, "AR": 0.7273, "BA": 0.6769, "BD": 0.2185, "BI": 0.1428, "BJ": 0.4555, "BK": 0.2177, "BP": 0.3219, "BQ": 0.4922, "integral": 0.4071}, {"channel": "Геосервисы", "format": "Баннеры", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.297, "AG": 0.0227, "AI": 0.18, "AR": 1.0, "BA": 0.6615, "BD": 0.9012, "BI": 0.1515, "BJ": 0.5268, "BK": 0.1885, "BP": 0.3247, "BQ": 0.5298, "integral": 0.4272}, {"channel": "Геосервисы", "format": "Премиум", "sreda": "Статика", "dur": null, "S": 0.5, "X": 0.3382, "AG": 0.0245, "AI": 0.21, "AR": 1.0, "BA": 0.6615, "BD": 0.9012, "BI": 0.1607, "BJ": 0.5268, "BK": 0.1666, "BP": 0.3205, "BQ": 0.5205, "integral": 0.4205}]}, "meta": {"n_detail": 126, "n_cf": 49, "n_macro": 15}};
+
+/* ===== metric metadata ===== */
+const META = {
+  S:{l:'Сила формата', d:'Сила воздействия в зависимости от формата (аудио, видео и т.д.)'},
+  X:{l:'Поле зрения', d:'Доля в поле зрения зрителя'},
+  AG:{l:'Длит. контакта', d:'Средняя длительность контакта'},
+  AI:{l:'Сост. контакты', d:'Доля состоявшихся контактов'},
+  AR:{l:'Антиклаттер момента', d:'Клаттер в моменте (нормализован: выше — чище)'},
+  BA:{l:'Доверие', d:'Доверие к рекламе в канале'},
+  BD:{l:'Антиклаттер канала', d:'Общая заклаттеренность канала (нормализован: выше — чище)'},
+  BI:{l:'Качество', d:'Индекс качества контакта'},
+  BJ:{l:'Релевантность', d:'Индекс релевантности — точность таргетинга'},
+  BK:{l:'Частота', d:'Индекс частоты — потенциал набора частоты'},
+  BP:{l:'Брендинг', d:'Эффективность для роста бренд-метрик'},
+  BQ:{l:'Конверсии', d:'Эффективность для роста бизнес-показателей'},
+  integral:{l:'Интегральный', d:'Среднее эффективности для брендинга и конверсий'}
+};
+const DRIVERS=['S','X','AG','AI','AR','BA','BD'];
+const SREDA_COLORS={'Текст':'#8C8C96','Статика':'#E08A00','Видео':'#E30611','Аудио':'#2440D9','Блогеры':'#119C7A','—':'#B8B6B0'};
+const GOAL_COLOR={integral:'#15151B',BP:'#E30611',BQ:'#2440D9'};
+
+let state={level:'macro',goal:'integral'};
+let selected=new Set();           // names manually picked for the charts
+let bubbleC,radarC,indicesC;
+
+/* ===== helpers ===== */
+function rows(){return DATA.levels[state.level].slice();}
+function nameOf(e){
+  if(state.level==='macro')return e.channel;
+  if(state.level==='channel_format')return e.channel+' · '+e.format;
+  return e.channel+' · '+e.format+(e.dur?(' · '+ (Number.isInteger(e.dur)?e.dur:e.dur)+'с'):'');
+}
+function subOf(e){
+  if(state.level==='macro')return (e.n||0)+' форматов · '+(e.sreda||'');
+  return e.sreda||'';
+}
+function sorted(){
+  return rows().filter(e=>e[state.goal]!=null)
+    .sort((a,b)=>b[state.goal]-a[state.goal]);
+}
+/* items shown in the charts = manually selected rows, kept in rank order */
+function chartItems(){return sorted().filter(e=>selected.has(nameOf(e)));}
+function defaultSelect(){
+  selected=new Set(sorted().slice(0,Math.min(5,sorted().length)).map(nameOf));
+}
+function fmt(v){return v==null?'—':v.toFixed(2);}
+
+/* ===== ranking ===== */
+function renderRanking(){
+  const data=sorted();
+  document.getElementById('rankTitle').textContent='Рейтинг по цели: '+META[state.goal].l.toLowerCase();
+  document.getElementById('rankCount').textContent=data.length+' элементов';
+  const max=Math.max(...data.map(e=>e[state.goal]),0.0001);
+  const col=GOAL_COLOR[state.goal];
+  const host=document.getElementById('rows'); host.innerHTML='';
+  data.forEach((e,i)=>{
+    const nm=nameOf(e), v=e[state.goal];
+    const pct=Math.max(4,(v/max)*100);
+    const inside=pct>30;
+    const r=document.createElement('div');
+    r.className='row'+(selected.has(nm)?' sel':'');
+    r.tabIndex=0; r.setAttribute('role','button');
+    const right=document.createElement('div');
+    right.style.cssText='display:flex;flex-direction:column;gap:6px;grid-column:3';
+    right.innerHTML=
+      '<div class="bararea"><div class="bartrack"><div class="barfill" style="width:'+pct+'%;background:'+col+'"></div></div>'+
+        '<div class="barval '+(inside?'inside':'')+' num" style="'+(inside?'left:8px;right:auto':'')+'">'+fmt(v)+'</div></div>'+
+      '<div class="chips"><span class="chip b num" title="Брендинг">'+fmt(e.BP)+'</span>'+
+        '<span class="chip c num" title="Конверсии">'+fmt(e.BQ)+'</span>'+
+        '<span class="chip q num" title="Качество">'+fmt(e.BI)+'</span></div>';
+    // rebuild row layout: name | right block
+    r.innerHTML='<div class="rk num">'+(i+1)+'</div>'+
+      '<div class="nm"><div class="t"><span class="box"></span><span class="nm-t" title="'+nm+'">'+nm+'</span></div><div class="s">'+subOf(e)+'</div></div>';
+    r.appendChild(right);
+    r.onclick=()=>toggleSel(nm);
+    r.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();toggleSel(nm);}};
+    host.appendChild(r);
+  });
+}
+function toggleSel(nm){
+  if(selected.has(nm))selected.delete(nm); else selected.add(nm);
+  renderRanking(); renderTray(); renderCharts();
+}
+
+/* ===== selection tray ===== */
+function renderTray(){
+  const t=document.getElementById('tray');
+  const sortedRows=sorted();
+  const picks=sortedRows.filter(e=>selected.has(nameOf(e)));
+  let html='<span class="lbl">Для графиков:</span>';
+  if(picks.length===0){
+    html+='<span class="empty">ничего не выбрано — отметьте каналы в списке</span>';
+  }else{
+    html+=picks.map(e=>{const nm=nameOf(e);
+      return '<span class="pick"><span class="nm-t" title="'+nm+'">'+nm+'</span>'+
+        '<span class="x" data-nm="'+encodeURIComponent(nm)+'" title="Убрать">×</span></span>';}).join('');
+  }
+  html+='<span class="act">'+
+    '<button id="trayTop">Топ-5 по цели</button>'+
+    '<button id="trayClear">Очистить</button></span>';
+  t.innerHTML=html;
+  t.querySelectorAll('.pick .x').forEach(x=>x.onclick=ev=>{
+    ev.stopPropagation(); toggleSel(decodeURIComponent(x.dataset.nm));});
+  document.getElementById('trayTop').onclick=()=>{defaultSelect();renderRanking();renderTray();renderCharts();};
+  document.getElementById('trayClear').onclick=()=>{selected.clear();renderRanking();renderTray();renderCharts();};
+}
+
+/* ===== bubble ===== */
+function renderBubble(){
+  const data=chartItems();
+  if(!data.length){bubbleC.setOption(emptyOpt('Выберите каналы в рейтинге, чтобы построить квадрант'),true);
+    document.getElementById('bubbleLegend').innerHTML='';return;}
+  const sredas=[...new Set(data.map(e=>e.sreda||'—'))];
+  const series=sredas.map(sr=>({
+    name:sr, type:'scatter',
+    symbolSize:d=>14+ (d[2]||0)*46,
+    itemStyle:{color:SREDA_COLORS[sr]||'#999',opacity:.82,borderColor:'#fff',borderWidth:1.5},
+    emphasis:{focus:'series',itemStyle:{opacity:1}},
+    labelLayout:{hideOverlap:true},
+    label:{show:true,formatter:p=>p.data[3],position:'top',fontSize:10,color:'#15151B',
+           fontFamily:'Inter',distance:6},
+    data:data.filter(e=>(e.sreda||'—')===sr).map(e=>[e.BP,e.BQ,e.integral, nameOf(e)])
+  }));
+  bubbleC.setOption({
+    grid:{left:64,right:30,top:30,bottom:58},
+    tooltip:{trigger:'item',backgroundColor:'#15151B',borderWidth:0,
+      textStyle:{color:'#fff',fontFamily:'Inter',fontSize:12},
+      formatter:p=>'<b>'+p.data[3]+'</b><br>Брендинг: '+fmt(p.data[0])+'<br>Конверсии: '+fmt(p.data[1])+'<br>Интегральный: '+fmt(p.data[2])},
+    xAxis:{name:'Брендинг →',nameLocation:'middle',nameGap:34,min:0,max:1,
+      nameTextStyle:{color:'#E30611',fontFamily:'Inter',fontWeight:600,fontSize:12},
+      axisLine:{lineStyle:{color:'#D8D6D0'}},splitLine:{lineStyle:{color:'#F0EEEA'}},
+      axisLabel:{color:'#9A9AA4',fontFamily:'Inter'}},
+    yAxis:{name:'Конверсии →',nameLocation:'middle',nameGap:40,min:0,max:1,
+      nameTextStyle:{color:'#2440D9',fontFamily:'Inter',fontWeight:600,fontSize:12},
+      axisLine:{lineStyle:{color:'#D8D6D0'}},splitLine:{lineStyle:{color:'#F0EEEA'}},
+      axisLabel:{color:'#9A9AA4',fontFamily:'Inter'}},
+    series
+  },true);
+  // custom legend
+  document.getElementById('bubbleLegend').innerHTML=
+    '<span><b>Среда:</b></span>'+sredas.map(s=>'<span><span class="dot" style="background:'+(SREDA_COLORS[s]||'#999')+'"></span>'+s+'</span>').join('')
+    +'<span><b>·</b> размер пузыря = интегральный рейтинг</span>';
+}
+
+/* ===== radar ===== */
+function renderRadar(){
+  let data=chartItems();
+  if(!data.length){radarC.setOption(emptyOpt('Нет выбранных элементов'),true);return;}
+  data=data.slice(0,8); // readability cap
+  const indicator=DRIVERS.map(k=>({name:META[k].l,max:1}));
+  const palette=['#E30611','#2440D9','#119C7A','#E08A00','#7A2BD9','#15151B','#C81E6E','#0E8F8A'];
+  radarC.setOption({
+    tooltip:{trigger:'item',backgroundColor:'#15151B',borderWidth:0,textStyle:{color:'#fff',fontFamily:'Inter',fontSize:12}},
+    legend:{type:'scroll',bottom:0,textStyle:{color:'#5C5C68',fontFamily:'Inter',fontSize:11},itemWidth:11,itemHeight:11},
+    radar:{indicator,radius:'66%',center:['50%','46%'],
+      axisName:{color:'#5C5C68',fontFamily:'Inter',fontSize:11},
+      splitLine:{lineStyle:{color:'#ECEAE5'}},splitArea:{areaStyle:{color:['#FBFAF8','#fff']}},
+      axisLine:{lineStyle:{color:'#ECEAE5'}}},
+    series:[{type:'radar',symbolSize:4,
+      data:data.map((e,i)=>({value:DRIVERS.map(k=>e[k]??0),name:nameOf(e),
+        lineStyle:{color:palette[i%8],width:2},itemStyle:{color:palette[i%8]},
+        areaStyle:{color:palette[i%8],opacity:.06}}))}]
+  },true);
+}
+
+/* ===== indices grouped bar ===== */
+function renderIndices(){
+  const data=chartItems();
+  if(!data.length){indicesC.setOption(emptyOpt('Нет выбранных элементов'),true);return;}
+  const names=data.map(nameOf);
+  const mk=(k,c)=>({name:META[k].l,type:'bar',data:data.map(e=>e[k]),
+    itemStyle:{color:c,borderRadius:[3,3,0,0]},barMaxWidth:16});
+  indicesC.setOption({
+    grid:{left:46,right:18,top:34,bottom:data.length>6?96:78},
+    tooltip:{trigger:'axis',backgroundColor:'#15151B',borderWidth:0,textStyle:{color:'#fff',fontFamily:'Inter',fontSize:12}},
+    legend:{top:0,textStyle:{color:'#5C5C68',fontFamily:'Inter',fontSize:11},itemWidth:11,itemHeight:11},
+    xAxis:{type:'category',data:names,axisLabel:{color:'#9A9AA4',fontFamily:'Inter',fontSize:10,interval:0,rotate:38,
+      formatter:v=>v.length>22?v.slice(0,21)+'…':v},axisLine:{lineStyle:{color:'#D8D6D0'}}},
+    yAxis:{type:'value',max:1,splitLine:{lineStyle:{color:'#F0EEEA'}},axisLabel:{color:'#9A9AA4',fontFamily:'Inter'}},
+    series:[mk('BI','#15151B'),mk('BJ','#2440D9'),mk('BK','#E08A00')]
+  },true);
+}
+
+/* ===== glossary ===== */
+function renderGloss(){
+  const order=['S','X','AG','AI','AR','BA','BD','BI','BJ','BK','BP','BQ','integral'];
+  document.getElementById('gloss').innerHTML=order.map(k=>
+    '<code>'+(k==='integral'?'INT':k)+'</code><span><b style="color:var(--ink)">'+META[k].l+'</b> — '+META[k].d+'</span>').join('');
+}
+
+/* ===== orchestration ===== */
+function emptyOpt(msg){return {title:{text:msg,left:'center',top:'middle',
+  textStyle:{color:'#9A9AA4',fontFamily:'Inter',fontSize:13,fontWeight:500}}};}
+function renderCharts(){renderBubble();renderRadar();renderIndices();}
+function renderAll(){renderRanking();renderTray();renderCharts();}
+function initCharts(){
+  bubbleC=echarts.init(document.getElementById('bubble'));
+  radarC=echarts.init(document.getElementById('radar'));
+  indicesC=echarts.init(document.getElementById('indices'));
+  window.addEventListener('resize',()=>{bubbleC.resize();radarC.resize();indicesC.resize();});
+}
+function bindSeg(id,key,parse){
+  document.getElementById(id).addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b)return;
+    [...e.currentTarget.children].forEach(c=>c.classList.remove('on'));
+    b.classList.add('on');
+    state[key]=parse?parse(b.dataset.v):b.dataset.v;
+    if(key==='level'){defaultSelect();}      // names are level-specific → reset to top-5
+    renderAll();
+  });
+}
+window.addEventListener('DOMContentLoaded',()=>{
+  initCharts(); renderGloss();
+  bindSeg('lvl','level'); bindSeg('goal','goal');
+  defaultSelect();
+  renderAll();
+});
+</script>
+</body>
+</html>
